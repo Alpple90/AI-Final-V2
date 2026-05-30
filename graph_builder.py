@@ -25,9 +25,6 @@ def build_graph(connections, coords):
             if 0.1 <= distance <= 10.0:
                 graph[node].append((neighbor, round(distance, 3)))
 
-    for node in graph:
-        graph[node].sort(key=lambda x: x[1])
-
     return graph
 
 
