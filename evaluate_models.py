@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from real_traffic_models import RealTrafficPredictor
+from pathfinder import PathFinder
+from graph_builder import buildGraph, getGraphInfo
+from map_visualization import SCATSMapViewer
 
 
 def runEvaluation():
@@ -113,6 +116,74 @@ def runEvaluation():
     print(f"  {bestName} produced the lowest prediction error on the held-out test set,")
     print(f"  making it the recommended model for real-time traffic flow forecasting.")
     print("---")
+
+    runRouteAgreement(predictor)
+
+
+# check whether each ML model recommends the same best route for a set of O/D pairs
+def runRouteAgreement(predictor):
+    print("\n===========================================")
+    print("ROUTE AGREEMENT")
+    print("===========================================")
+    print("Checking if LSTM, GRU and XGBoost recommend the same route\n")
+
+    # load map and build graph
+    mapViewer = SCATSMapViewer()
+    coords = mapViewer.loadCoords()
+    graph = buildGraph(mapViewer.getNodeConnections(), coords)
+    pathfinder = PathFinder(graph, predictor, coords)
+
+    # test pairs covering different parts of the network
+    testPairs = [
+        (970,  2000),
+        (970,  4040),
+        (3001, 4812),
+        (2820, 4063),
+        (3180, 3682),
+        (4821, 2200),
+        (4030, 3120),
+        (2827, 4264),
+    ]
+
+    models = ['lstm', 'gru', 'xgboost']
+    hour = 8  # morning peak
+
+    agreeCount = 0
+    totalPairs = 0
+
+    for origin, dest in testPairs:
+        routes = {}
+        for modelName in models:
+            pathfinder.setModel(modelName)
+            # use astar for a consistent single best path per model
+            pathfinder.setAlgorithm('astar')
+            path, cost, _ = pathfinder.findPath(origin, dest, hour)
+            routes[modelName] = tuple(path) if path else None
+
+        # check if all 3 models agree on the same route
+        uniqueRoutes = set(r for r in routes.values() if r is not None)
+        allAgree = len(uniqueRoutes) == 1
+
+        if allAgree:
+            agreeCount += 1
+        totalPairs += 1
+
+        status = "AGREE" if allAgree else "DIFFER"
+        print(f"  {origin} -> {dest}: {status}")
+        if not allAgree:
+            for modelName, route in routes.items():
+                routeStr = ' -> '.join(str(n) for n in route) if route else 'No path'
+                print(f"    {modelName.upper()}: {routeStr}")
+
+    agreePct = (agreeCount / totalPairs) * 100 if totalPairs > 0 else 0
+    print(f"\n  Agreement rate: {agreeCount}/{totalPairs} pairs ({agreePct:.0f}%)")
+    if agreePct == 100:
+        print("  All models recommend the same route for every pair.")
+    elif agreePct >= 75:
+        print("  Models mostly agree — ML model choice has minimal routing impact.")
+    else:
+        print("  Models disagree on several routes — ML model choice affects routing.")
+    print("===========================================")
 
 
 if __name__ == '__main__':
