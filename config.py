@@ -36,7 +36,7 @@ MAX_VISITS_PER_NODE = 5      # Prevent infinite loops
 # ============================================================
 WINDOW_WIDTH = 1400
 WINDOW_HEIGHT = 800
-LEFT_PANEL_WIDTH = 450
+LEFT_PANEL_WIDTH = 280
 
 # ============================================================
 # FILE PATHS

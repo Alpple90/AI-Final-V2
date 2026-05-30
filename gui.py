@@ -45,12 +45,12 @@ class TBRGSGUI:
     def _build_gui(self):
         # Left panel
         left_panel = tk.Frame(self.root, bg='#f0f0f0', width=LEFT_PANEL_WIDTH)
-        left_panel.pack(side='left', fill='both', expand=False, padx=(10, 5), pady=10)
+        left_panel.pack(side='left', fill='both', expand=False, padx=(5, 2), pady=5)
         left_panel.pack_propagate(False)
-        
+
         # Right panel for map
         self.right_panel = tk.Frame(self.root, bg='#ffffff', bd=2, relief='sunken')
-        self.right_panel.pack(side='right', fill='both', expand=True, padx=(5, 10), pady=10)
+        self.right_panel.pack(side='right', fill='both', expand=True, padx=(2, 5), pady=5)
         
         # Title
         tk.Label(left_panel, text="TRAFFIC-BASED ROUTE GUIDANCE", 
