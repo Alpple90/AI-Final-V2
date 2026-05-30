@@ -371,6 +371,22 @@ class PathFinder:
         print(f"Total distinct routes found: {len(result)}")
         return result
 
+    def find_unique_paths_all_algorithms(self, start, goal, hour=12, max_paths=5):
+        """Run all 6 algorithms once each, return up to max_paths unique paths sorted by travel time."""
+        seen = set()
+        results = []
+
+        for algo_name, algo_func in self.algorithms.items():
+            path, cost, _ = algo_func(start, goal, hour)
+            if path:
+                key = tuple(path)
+                if key not in seen:
+                    seen.add(key)
+                    results.append((path, cost))
+
+        results.sort(key=lambda x: x[1])
+        return results[:max_paths]
+
     def get_graph_info(self):
         total_nodes = len(self.graph)
         total_edges = sum(len(neighbors) for neighbors in self.graph.values()) // 2

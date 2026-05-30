@@ -5,7 +5,7 @@ Tkinter GUI for TBRGS with Top-K Routes and Algorithm Selection
 
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-from config import WINDOW_WIDTH, WINDOW_HEIGHT, LEFT_PANEL_WIDTH, DEFAULT_K_ROUTES
+from config import WINDOW_WIDTH, WINDOW_HEIGHT, LEFT_PANEL_WIDTH
 
 
 class TBRGSGUI:
@@ -21,8 +21,6 @@ class TBRGSGUI:
         self.origin_var = tk.StringVar()
         self.dest_var = tk.StringVar()
         self.time_var = tk.StringVar(value="12:00")
-        self.k_value = tk.IntVar(value=DEFAULT_K_ROUTES)
-        self.algorithm_var = tk.StringVar(value='astar')
         
         # Map widgets reference
         self.map_widget = None
@@ -61,7 +59,6 @@ class TBRGSGUI:
         # Build all frames
         self._build_input_frame(left_panel)
         self._build_model_frame(left_panel)
-        self._build_algorithm_frame(left_panel)
         self._build_button_frame(left_panel)
         self._build_results_frame(left_panel)
         self._build_status_bar()
@@ -107,43 +104,6 @@ class TBRGSGUI:
             tk.Radiobutton(model_frame, text=text, variable=self.current_model,
                           value=value, font=('Arial', 10), bg='#f0f0f0').grid(
                           row=0, column=i, padx=20, pady=5)
-        
-        tk.Label(model_frame, text="Number of routes (K):", font=('Arial', 10), 
-                bg='#f0f0f0').grid(row=1, column=0, sticky='w', pady=5)
-        tk.Spinbox(model_frame, from_=1, to=10, textvariable=self.k_value, 
-                  width=5).grid(row=1, column=1, sticky='w', pady=5, padx=(10, 0))
-    
-    def _build_algorithm_frame(self, parent):
-        algo_frame = tk.LabelFrame(parent, text="Search Algorithm", 
-                                    font=('Arial', 11, 'bold'), 
-                                    bg='#f0f0f0', padx=10, pady=10)
-        algo_frame.pack(fill='x', pady=(0, 10))
-        
-        tk.Label(algo_frame, text="Select Algorithm:", font=('Arial', 10), 
-                bg='#f0f0f0').grid(row=0, column=0, sticky='w', pady=5)
-        
-        algorithms = ['astar', 'bidirectional', 'dijkstra', 'greedy', 'bfs', 'dfs']
-        algo_names = ['A*', 'Bidirectional A*', 'Dijkstra', 'Greedy', 'BFS', 'DFS']
-        
-        self.algo_combo = ttk.Combobox(algo_frame, textvariable=self.algorithm_var, 
-                                        values=algorithms, width=15)
-        self.algo_combo.grid(row=0, column=1, pady=5, padx=(10, 0))
-        
-        # Display current algorithm name
-        self.algo_label = tk.Label(algo_frame, text="", font=('Arial', 9), 
-                                    bg='#f0f0f0', fg='#2e7d32')
-        self.algo_label.grid(row=1, column=0, columnspan=2, pady=5)
-        
-        def on_algo_change(*args):
-            algo = self.algorithm_var.get()
-            self.pathfinder.set_algorithm(algo)
-            names = {'astar': 'A* (Optimal)', 'bidirectional': 'Bidirectional A* (Fast)',
-                    'dijkstra': "Dijkstra's (Optimal)", 'greedy': 'Greedy (Fast)',
-                    'bfs': 'BFS (Fewest Hops)', 'dfs': 'DFS (Memory Efficient)'}
-            self.algo_label.config(text=f"✓ Using: {names.get(algo, algo)}")
-        
-        self.algorithm_var.trace('w', on_algo_change)
-        on_algo_change()
     
     def _build_button_frame(self, parent):
         button_frame = tk.Frame(parent, bg='#f0f0f0')
@@ -255,53 +215,42 @@ class TBRGSGUI:
         return origin, dest, hour
     
     def find_routes(self):
-        """Find and display top-K routes"""
+        """Run all 6 algorithms once each and display up to 5 unique routes."""
         origin, dest, hour = self.get_user_input()
         if origin is None:
             return
-        
+
         model_name = self.current_model.get()
-        algorithm = self.algorithm_var.get()
-        k = self.k_value.get()
-        
-        self.status_var.set(f"Finding top-{k} routes from {origin} to {dest} "
-                           f"using {algorithm.upper()} with {model_name.upper()}...")
+
+        self.status_var.set(f"Finding routes from {origin} to {dest} using all algorithms "
+                            f"with {model_name.upper()}...")
         self.root.update()
-        
-        # Clear previous results
+
         self.results_text.delete(1.0, tk.END)
         self.map_viewer.clear_route()
-        
-        # Set algorithm and model
-        self.pathfinder.set_algorithm(algorithm)
+
         self.pathfinder.set_model(model_name)
-        
-        # Find paths
-        paths = self.pathfinder.find_top_k_paths(origin, dest, k, hour)
-        
-        # Draw the best route on map
+
+        paths = self.pathfinder.find_unique_paths_all_algorithms(origin, dest, hour, max_paths=5)
+
         if paths:
             self.map_viewer.draw_route(paths[0][0])
-            self.status_var.set(f"✓ Found {len(paths)} routes. Best: {paths[0][1]:.1f} minutes")
+            self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes")
         else:
             self.status_var.set("No routes found. Try different origin/destination.")
-        
-        # Display results
-        self._display_results(origin, dest, hour, model_name, algorithm, paths, k)
+
+        self._display_results(origin, dest, hour, model_name, paths)
     
-    def _display_results(self, origin, dest, hour, model_name, algorithm, paths, k):
-        """Display formatted results including all top-K routes"""
+    def _display_results(self, origin, dest, hour, model_name, paths):
+        """Display formatted results including all unique routes."""
         self.results_text.insert(tk.END, "=" * 65 + "\n")
         self.results_text.insert(tk.END, "TBRGS ROUTE RESULTS\n")
         self.results_text.insert(tk.END, "=" * 65 + "\n\n")
-        
-        # Trip information
+
         self.results_text.insert(tk.END, f"Origin:      SCATS {origin}\n")
         self.results_text.insert(tk.END, f"Destination: SCATS {dest}\n")
         self.results_text.insert(tk.END, f"Departure:   {self.time_var.get()} (Hour {hour}:00)\n")
         self.results_text.insert(tk.END, f"ML Model:    {model_name.upper()}\n")
-        self.results_text.insert(tk.END, f"Algorithm:   {algorithm.upper()}\n")
-        self.results_text.insert(tk.END, f"Routes Req:  {k}\n")
         self.results_text.insert(tk.END, "=" * 65 + "\n\n")
         
         if not paths:
