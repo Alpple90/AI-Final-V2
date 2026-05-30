@@ -1,10 +1,8 @@
 import math
-import tkinter as tk
 import tkintermapview
 import pandas as pd
- 
-EXCEL_FILE = "TrafficData.xlsx"
-TRUE_FILE  = "scatsTrueLongLat.xlsx"
+
+TRUE_FILE = "scatsTrueLongLat.xlsx"
  
 NODE_CONNECTIONS = {
     '970':  ['3685', '2846'], 
@@ -66,19 +64,11 @@ NODE_COLOURS = {
  
  
 def load_sites():
-    true = pd.read_excel(TRUE_FILE)
-    true[['LAT', 'LNG']] = true['Lat Long'].str.split(expand=True).astype(float)
-    true['KEY'] = true['SCATS Number'].astype(str).str.lstrip('0').str.strip()
-    true.loc[true['KEY'] == '', 'KEY'] = '0'
- 
-    df = pd.read_excel(EXCEL_FILE, header=1)
-    excel = df[['SCATS Number', 'Location']].drop_duplicates(subset='SCATS Number').copy()
-    excel['SCATS Number'] = excel['SCATS Number'].astype(str).str.lstrip('0').str.strip()
-    excel.loc[excel['SCATS Number'] == '', 'SCATS Number'] = '0'
-    excel['Location'] = excel['Location'].str.replace('_', ' ')
- 
-    return excel.merge(true[['KEY', 'LAT', 'LNG']],
-                       left_on='SCATS Number', right_on='KEY', how='inner')
+    df = pd.read_excel(TRUE_FILE)
+    df[['LAT', 'LNG']] = df['Lat Long'].str.split(expand=True).astype(float)
+    df['SCATS Number'] = df['SCATS Number'].astype(str).str.lstrip('0').str.strip()
+    df.loc[df['SCATS Number'] == '', 'SCATS Number'] = '0'
+    return df[['SCATS Number', 'LAT', 'LNG']]
  
  
 def draw_edges(map_widget, coords):
