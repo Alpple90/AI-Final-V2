@@ -29,7 +29,6 @@ MOCK_CONNECTIONS = {
 
 
 class MockPredictor:
-    # always return a steady 100 vehicles per 15 min
     def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
         return 100
 
