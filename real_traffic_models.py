@@ -6,14 +6,13 @@ Uses .keras format for better compatibility
 
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import timedelta
 import os
 import joblib
 import warnings
 warnings.filterwarnings('ignore')
 
 # Deep Learning imports
-import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input
 from tensorflow.keras.callbacks import EarlyStopping

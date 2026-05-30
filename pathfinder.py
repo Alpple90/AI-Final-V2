@@ -5,13 +5,13 @@ Pathfinding with 6 Search Algorithms - Supports Top-K Routes
 
 from heapq import heappush, heappop
 import math
-from config import DEFAULT_K_ROUTES, MAX_VISITS_PER_NODE
+from config import DEFAULT_K_ROUTES
+from travel_time import calculate_travel_time
 
 
 class PathFinder:
-    def __init__(self, graph, travel_time_calculator, traffic_predictor, coords=None):
+    def __init__(self, graph, traffic_predictor, coords=None):
         self.graph = graph
-        self.tt_calc = travel_time_calculator
         self.traffic_predictor = traffic_predictor
         self.coords = coords or {}
         self.current_model = 'lstm'
@@ -35,12 +35,9 @@ class PathFinder:
             return True
         return False
     
-    def set_coordinates(self, coords):
-        self.coords = coords
-
     def _get_edge_cost(self, from_node, to_node, distance, hour):
         predicted_flow = self.traffic_predictor.predict(self.current_model, None, hour)
-        return self.tt_calc.calculate_travel_time(distance, predicted_flow)
+        return calculate_travel_time(distance, predicted_flow)
     
     def _calculate_path_time(self, path, hour):
         if len(path) < 2:
@@ -100,29 +97,24 @@ class PathFinder:
         start_str, goal_str = str(start), str(goal)
         if start_str not in self.graph or goal_str not in self.graph:
             return None, float('inf'), 0
-        
+
         stack = [(start_str, [start_str], 0)]
         visited = set()
         nodes_explored = 0
-        best_path, best_cost = None, float('inf')
-        
+
         while stack:
             current, path, depth = stack.pop()
             nodes_explored += 1
-            if depth > max_depth:
-                continue
             if current == goal_str:
                 total_time = self._calculate_path_time([int(n) for n in path], hour)
-                if total_time < best_cost:
-                    best_cost, best_path = total_time, [int(n) for n in path]
-                continue
-            if current in visited:
+                return [int(n) for n in path], total_time, nodes_explored
+            if current in visited or depth > max_depth:
                 continue
             visited.add(current)
             for neighbor, _ in self.graph.get(current, []):
                 if neighbor not in path:
                     stack.append((neighbor, path + [neighbor], depth + 1))
-        return best_path, best_cost, nodes_explored
+        return None, float('inf'), nodes_explored
 
     def _greedy(self, start, goal, hour=12):
         start_str, goal_str = str(start), str(goal)
@@ -207,28 +199,29 @@ class PathFinder:
             return None, float('inf'), 0
         
         forward_pq = [(self._heuristic(start_str, goal_str), 0, start_str, [start_str], 0)]
-        forward_visited = {start_str: (0, [start_str])}
+        forward_visited = {}
         backward_pq = [(self._heuristic(goal_str, start_str), 0, goal_str, [goal_str], 0)]
-        backward_visited = {goal_str: (0, [goal_str])}
-        
+        backward_visited = {}
+
         nodes_explored = 0
         best_path = None
         best_cost = float('inf')
         counter = 0
-        
+
         while forward_pq and backward_pq:
-            if forward_pq:
-                _, _, current, path, cost = heappop(forward_pq)
-                nodes_explored += 1
+            # Forward step
+            _, _, current, path, cost = heappop(forward_pq)
+            nodes_explored += 1
+            if current in forward_visited and forward_visited[current][0] <= cost:
+                pass
+            else:
+                forward_visited[current] = (cost, path)
                 if current in backward_visited:
                     back_cost, back_path = backward_visited[current]
                     total_cost = cost + back_cost
                     if total_cost < best_cost:
                         best_cost = total_cost
                         best_path = [int(n) for n in (path[:-1] + back_path[::-1])]
-                if current in forward_visited and forward_visited[current][0] <= cost:
-                    continue
-                forward_visited[current] = (cost, path)
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
@@ -237,19 +230,20 @@ class PathFinder:
                     h = self._heuristic(neighbor, goal_str)
                     counter += 1
                     heappush(forward_pq, (new_cost + h, counter, neighbor, path + [neighbor], new_cost))
-            
-            if backward_pq:
-                _, _, current, path, cost = heappop(backward_pq)
-                nodes_explored += 1
+
+            # Backward step
+            _, _, current, path, cost = heappop(backward_pq)
+            nodes_explored += 1
+            if current in backward_visited and backward_visited[current][0] <= cost:
+                pass
+            else:
+                backward_visited[current] = (cost, path)
                 if current in forward_visited:
-                    forward_cost, forward_path = forward_visited[current]
-                    total_cost = forward_cost + cost
+                    fwd_cost, fwd_path = forward_visited[current]
+                    total_cost = fwd_cost + cost
                     if total_cost < best_cost:
                         best_cost = total_cost
-                        best_path = [int(n) for n in (forward_path[:-1] + path[::-1])]
-                if current in backward_visited and backward_visited[current][0] <= cost:
-                    continue
-                backward_visited[current] = (cost, path)
+                        best_path = [int(n) for n in (fwd_path[:-1] + path[::-1])]
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
@@ -258,14 +252,13 @@ class PathFinder:
                     h = self._heuristic(neighbor, start_str)
                     counter += 1
                     heappush(backward_pq, (new_cost + h, counter, neighbor, path + [neighbor], new_cost))
-            
+
             if best_path and forward_pq and backward_pq:
                 if forward_pq[0][0] + backward_pq[0][0] >= best_cost:
                     break
-        
+
         if best_path:
-            total_time = self._calculate_path_time(best_path, hour)
-            return best_path, total_time, nodes_explored
+            return best_path, round(best_cost, 2), nodes_explored
         return None, float('inf'), nodes_explored
 
     # ============================================================
@@ -371,24 +364,24 @@ class PathFinder:
         print(f"Total distinct routes found: {len(result)}")
         return result
 
-    def get_graph_info(self):
-        total_nodes = len(self.graph)
-        total_edges = sum(len(neighbors) for neighbors in self.graph.values()) // 2
-        return {
-            'total_nodes': total_nodes,
-            'total_edges': total_edges,
-            'isolated_nodes': sum(1 for n in self.graph.values() if not n)
-        }
-    
-    def get_algorithm_list(self):
-        return list(self.algorithms.keys())
-    
-    def get_algorithm_info(self):
-        return {
-            'bfs': {'name': 'BFS', 'optimal': False, 'complete': True},
-            'dfs': {'name': 'DFS', 'optimal': False, 'complete': False},
-            'greedy': {'name': 'Greedy Best-First', 'optimal': False, 'complete': False},
-            'astar': {'name': 'A*', 'optimal': True, 'complete': True},
-            'dijkstra': {'name': "Dijkstra's", 'optimal': True, 'complete': True},
-            'bidirectional': {'name': 'Bidirectional A*', 'optimal': True, 'complete': True}
-        }
+    def find_unique_paths_all_algorithms(self, start, goal, hour=12, max_paths=5):
+        """Run all 6 algorithms once each, return up to max_paths unique paths sorted by travel time.
+        Returns list of (path, cost, algo_name) tuples."""
+        seen = {}  # path_tuple -> index in results
+        results = []
+
+        for algo_name, algo_func in self.algorithms.items():
+            path, cost, _ = algo_func(start, goal, hour)
+            if path:
+                key = tuple(path)
+                if key in seen:
+                    idx = seen[key]
+                    existing_path, existing_cost, existing_algos = results[idx]
+                    results[idx] = (existing_path, existing_cost, existing_algos + [algo_name])
+                else:
+                    seen[key] = len(results)
+                    results.append((path, cost, [algo_name]))
+
+        results.sort(key=lambda x: x[1])
+        return results[:max_paths]
+

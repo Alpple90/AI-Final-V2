@@ -7,11 +7,6 @@ All constants in one place for easy modification
 # ============================================================
 # TRAFFIC PREDICTION SETTINGS
 # ============================================================
-SEQ_LENGTH = 12              # Number of past 15-min intervals (12 = 3 hours)
-BATCH_SIZE = 32              # Batch size for deep learning
-LEARNING_RATE = 0.001        # Learning rate for LSTM/GRU
-LSTM_EPOCHS = 50             # Number of training epochs for LSTM
-GRU_EPOCHS = 50              # Number of training epochs for GRU
 
 # ============================================================
 # TRAVEL TIME SETTINGS (from PDF v1.0)
@@ -41,8 +36,6 @@ LEFT_PANEL_WIDTH = 450
 # ============================================================
 # FILE PATHS
 # ============================================================
-TRAFFIC_DATA_FILE = 'Scats Data October 2006.xls'
-COORDINATES_FILE = 'scatsTrueLongLat.xlsx'
 MODELS_SAVE_FOLDER = 'saved_models'
 
 # ============================================================
