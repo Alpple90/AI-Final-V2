@@ -120,7 +120,7 @@ class RealTrafficPredictor:
             'y_test': y_test,
         }
 
-    def _buildLSTM(self):
+    def buildLSTM(self):
         model = Sequential([
             Input(shape=(self.seqLen, 1)),
             LSTM(128, return_sequences=True),
@@ -136,7 +136,7 @@ class RealTrafficPredictor:
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
 
-    def _buildGRU(self):
+    def buildGRU(self):
         model = Sequential([
             Input(shape=(self.seqLen, 1)),
             GRU(128, return_sequences=True),
@@ -158,7 +158,7 @@ class RealTrafficPredictor:
             print(f"Training samples: {len(X_train)}")
             print(f"Validation samples: {len(X_test)}")
 
-        model = self._buildLSTM()
+        model = self.buildLSTM()
 
         earlyStop = EarlyStopping(
             monitor='val_loss',
@@ -182,7 +182,7 @@ class RealTrafficPredictor:
         self.trainingHistory['lstm'] = history.history
 
         if verbose:
-            self._evalModel('lstm', model, X_test, y_test)
+            self.evalModel('lstm', model, X_test, y_test)
 
         return model
 
@@ -192,7 +192,7 @@ class RealTrafficPredictor:
             print(f"Training samples: {len(X_train)}")
             print(f"Validation samples: {len(X_test)}")
 
-        model = self._buildGRU()
+        model = self.buildGRU()
 
         earlyStop = EarlyStopping(
             monitor='val_loss',
@@ -216,7 +216,7 @@ class RealTrafficPredictor:
         self.trainingHistory['gru'] = history.history
 
         if verbose:
-            self._evalModel('gru', model, X_test, y_test)
+            self.evalModel('gru', model, X_test, y_test)
 
         return model
 
@@ -246,12 +246,12 @@ class RealTrafficPredictor:
         self.models['xgboost'] = model
 
         if verbose:
-            self._evalModel('xgboost', model, X_test, y_test)
-            self._printFeatureImportance(model)
+            self.evalModel('xgboost', model, X_test, y_test)
+            self.printFeatureImportance(model)
 
         return model
 
-    def _evalModel(self, name, model, X_test, y_test):
+    def evalModel(self, name, model, X_test, y_test):
         if name in ['lstm', 'gru']:
             yPred = model.predict(X_test, verbose=0).flatten()
         else:
@@ -272,7 +272,7 @@ class RealTrafficPredictor:
         self.trainingHistory[name]['test_rmse'] = rmse
         self.trainingHistory[name]['test_r2'] = r2
 
-    def _printFeatureImportance(self, model):
+    def printFeatureImportance(self, model):
         importance = model.feature_importances_
         print("\nXGBoost Feature Importance:")
         print(f"  Past 12 traffic volumes: {importance[:self.seqLen].sum():.3f}")
@@ -284,10 +284,10 @@ class RealTrafficPredictor:
     def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
         # fall back to time-of-day heuristic if no model or sequence
         if lastSeq is None:
-            return self._fallbackPredict(hourOfDay)
+            return self.fallbackPredict(hourOfDay)
 
         if modelName not in self.models:
-            return self._fallbackPredict(hourOfDay)
+            return self.fallbackPredict(hourOfDay)
 
         model = self.models[modelName]
 
@@ -311,7 +311,7 @@ class RealTrafficPredictor:
 
         return max(5, int(predVolume))
 
-    def _fallbackPredict(self, hourOfDay):
+    def fallbackPredict(self, hourOfDay):
         # rough hourly traffic profile when no model is available
         if 7 <= hourOfDay <= 9:
             return 180 + (hourOfDay - 7) * 50

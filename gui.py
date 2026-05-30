@@ -22,20 +22,20 @@ class TBRGSGUI:
         self.statusVar = None
         self.currentPaths = []
 
-        self._setupWindow()
-        self._buildGui()
+        self.setupWindow()
+        self.buildGui()
 
         if self.map_viewer.mapAvailable():
-            self._initMap()
+            self.initMap()
         else:
-            self._showMapUnavail()
+            self.showMapUnavail()
 
-    def _setupWindow(self):
+    def setupWindow(self):
         self.root.title("TBRGS - Traffic-Based Route Guidance System")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.configure(bg='#f0f0f0')
 
-    def _buildGui(self):
+    def buildGui(self):
         leftPanel = tk.Frame(self.root, bg='#f0f0f0', width=LEFT_PANEL_WIDTH)
         leftPanel.pack(side='left', fill='both', expand=False, padx=(10, 5), pady=10)
         leftPanel.pack_propagate(False)
@@ -51,13 +51,13 @@ class TBRGSGUI:
                 bg='#f0f0f0', fg='#2e7d32', wraplength=LEFT_PANEL_WIDTH-20,
                 justify='left').pack(fill='x', padx=10, pady=(0, 10))
 
-        self._buildInputFrame(leftPanel)
-        self._buildModelFrame(leftPanel)
-        self._buildBtnFrame(leftPanel)
-        self._buildRouteSelector(leftPanel)
-        self._buildResultsFrame(leftPanel)
+        self.buildInputFrame(leftPanel)
+        self.buildModelFrame(leftPanel)
+        self.buildBtnFrame(leftPanel)
+        self.buildRouteSelector(leftPanel)
+        self.buildResultsFrame(leftPanel)
 
-    def _buildInputFrame(self, parent):
+    def buildInputFrame(self, parent):
         inputFrame = tk.LabelFrame(parent, text="Trip Information",
                                     font=('Arial', 11, 'bold'),
                                     bg='#f0f0f0', padx=10, pady=10)
@@ -67,14 +67,14 @@ class TBRGSGUI:
                 bg='#f0f0f0').grid(row=0, column=0, sticky='w', pady=5)
         self.originCombo = ttk.Combobox(inputFrame, textvariable=self.originVar, width=20)
         self.originCombo.grid(row=0, column=1, pady=5, padx=(10, 0))
-        tk.Button(inputFrame, text="Locate", command=self._locateOrigin,
+        tk.Button(inputFrame, text="Locate", command=self.locateOrigin,
                  font=('Arial', 8), width=6).grid(row=0, column=2, padx=5)
 
         tk.Label(inputFrame, text="Destination SCATS:", font=('Arial', 10),
                 bg='#f0f0f0').grid(row=1, column=0, sticky='w', pady=5)
         self.destCombo = ttk.Combobox(inputFrame, textvariable=self.destVar, width=20)
         self.destCombo.grid(row=1, column=1, pady=5, padx=(10, 0))
-        tk.Button(inputFrame, text="Locate", command=self._locateDest,
+        tk.Button(inputFrame, text="Locate", command=self.locateDest,
                  font=('Arial', 8), width=6).grid(row=1, column=2, padx=5)
 
         tk.Label(inputFrame, text="Departure Time:", font=('Arial', 10),
@@ -84,7 +84,7 @@ class TBRGSGUI:
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
 
-    def _buildModelFrame(self, parent):
+    def buildModelFrame(self, parent):
         modelFrame = tk.LabelFrame(parent, text="ML Model Selection",
                                     font=('Arial', 11, 'bold'),
                                     bg='#f0f0f0', padx=10, pady=10)
@@ -96,7 +96,7 @@ class TBRGSGUI:
                           value=value, font=('Arial', 10), bg='#f0f0f0').grid(
                           row=0, column=i, padx=20, pady=5)
 
-    def _buildBtnFrame(self, parent):
+    def buildBtnFrame(self, parent):
         btnFrame = tk.Frame(parent, bg='#f0f0f0')
         btnFrame.pack(fill='x', pady=(0, 10))
 
@@ -124,7 +124,7 @@ class TBRGSGUI:
                   font=('Arial', 10),
                   padx=15, pady=5).pack(side='left', padx=5)
 
-    def _buildRouteSelector(self, parent):
+    def buildRouteSelector(self, parent):
         self.routeSelectorFrame = tk.LabelFrame(parent, text="Display Route",
                                                    font=('Arial', 11, 'bold'),
                                                    bg='#f0f0f0', padx=10, pady=5)
@@ -134,7 +134,7 @@ class TBRGSGUI:
         tk.Label(self.routeSelectorFrame, text="Find routes to see options.",
                  font=('Arial', 9), bg='#f0f0f0', fg='#888888').pack()
 
-    def _buildResultsFrame(self, parent):
+    def buildResultsFrame(self, parent):
         resultsFrame = tk.LabelFrame(parent, text="Route Results (Top-K Routes)",
                                       font=('Arial', 11, 'bold'),
                                       bg='#f0f0f0', padx=10, pady=10)
@@ -144,17 +144,17 @@ class TBRGSGUI:
                                                        width=55, font=('Courier', 9))
         self.resultsText.pack(fill='both', expand=True)
 
-    def _initMap(self):
+    def initMap(self):
         self.mapWidget = self.map_viewer.createMap(self.rightPanel)
         self.map_viewer.drawNetwork()
-        self._updateSiteLists()
+        self.updateSiteLists()
 
-    def _showMapUnavail(self):
+    def showMapUnavail(self):
         tk.Label(self.rightPanel,
                 text="Map visualization unavailable.\n\nPlease install tkintermapview:\npip install tkintermapview",
                 font=('Arial', 12), bg='#ffffff', fg='#ff0000').pack(expand=True)
 
-    def _updateSiteLists(self):
+    def updateSiteLists(self):
         # fill both dropdowns with available SCATS sites
         sites = self.map_viewer.getSites()
         self.originCombo['values'] = sites
@@ -163,19 +163,19 @@ class TBRGSGUI:
             self.originCombo.set(str(sites[0]))
             self.destCombo.set(str(sites[1]))
 
-    def _locateOrigin(self):
+    def locateOrigin(self):
         site = self.originVar.get()
         if site:
             self.map_viewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
-    def _locateDest(self):
+    def locateDest(self):
         site = self.destVar.get()
         if site:
             self.map_viewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
-    def _populateRouteBtns(self):
+    def populateRouteBtns(self):
         for w in self.routeBtnsRow.winfo_children():
             w.destroy()
         for w in self.routeSelectorFrame.winfo_children():
@@ -187,14 +187,14 @@ class TBRGSGUI:
             color = routeColors[i % len(routeColors)]
             btn = tk.Button(self.routeBtnsRow,
                             text=f"Route {i+1}",
-                            command=lambda idx=i: self._selectRoute(idx),
+                            command=lambda idx=i: self.selectRoute(idx),
                             bg=color, fg='white',
                             font=('Arial', 9, 'bold'),
                             padx=8, pady=3,
                             relief='sunken' if i == 0 else 'raised')
             btn.pack(side='left', padx=3, pady=3)
 
-    def _selectRoute(self, idx):
+    def selectRoute(self, idx):
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.currentPaths[idx]
         self.map_viewer.clearRoute()
@@ -261,13 +261,13 @@ class TBRGSGUI:
             self.statusVar.set(f"Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({bestAlgos})")
         else:
             self.statusVar.set("No routes found. Try different origin/destination.")
-        self._populateRouteBtns()
+        self.populateRouteBtns()
         if paths:
-            self._selectRoute(0)
+            self.selectRoute(0)
 
-        self._displayResults(origin, dest, hour, modelName, paths)
+        self.displayResults(origin, dest, hour, modelName, paths)
 
-    def _displayResults(self, origin, dest, hour, modelName, paths):
+    def displayResults(self, origin, dest, hour, modelName, paths):
         SEP = "=" * 40
         self.resultsText.insert(tk.END, SEP + "\n")
         self.resultsText.insert(tk.END, "TBRGS ROUTE RESULTS\n")
