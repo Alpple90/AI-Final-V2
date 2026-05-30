@@ -22,18 +22,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 class RealTrafficPredictor:
-    def __init__(self, seq_length=12, batch_size=32, learning_rate=0.001):
-        self.seq_length = seq_length
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
+    def __init__(self, seqLen=12, batchSize=32, lr=0.001):
+        self.seqLen = seqLen
+        self.batchSize = batchSize
+        self.lr = lr
         self.models = {}
         self.scaler = StandardScaler()
-        self.training_history = {}
+        self.trainingHistory = {}
 
-    def load_data_from_excel(self, excel_file='Scats Data October 2006.xls'):
+    def loadData(self, excelFile='Scats Data October 2006.xls'):
         print("--- Loading traffic data from Excel ---")
 
-        df = pd.read_excel(excel_file, sheet_name='Data', header=1)
+        df = pd.read_excel(excelFile, sheet_name='Data', header=1)
         print(f"Loaded {len(df)} rows of traffic data")
 
         # grab volume columns (V0, V1, ... V95 etc.)
@@ -70,17 +70,17 @@ class RealTrafficPredictor:
 
         # build sliding window sequences
         X, y = [], []
-        for i in range(len(allVolumes) - self.seq_length - 1):
-            X.append(allVolumes[i:i + self.seq_length])
-            y.append(allVolumes[i + self.seq_length])
+        for i in range(len(allVolumes) - self.seqLen - 1):
+            X.append(allVolumes[i:i + self.seqLen])
+            y.append(allVolumes[i + self.seqLen])
 
         X = np.array(X, dtype=np.float32)
         y = np.array(y, dtype=np.float32)
         print(f"Created {len(X)} training sequences")
 
         timeFeatures = np.column_stack([
-            hours[self.seq_length:-1],
-            dayOfWeek[self.seq_length:-1]
+            hours[self.seqLen:-1],
+            dayOfWeek[self.seqLen:-1]
         ])
 
         splitIdx = int(len(X) * 0.8)
@@ -93,16 +93,16 @@ class RealTrafficPredictor:
         timeTest = timeFeatures[splitIdx:]
 
         # normalize flow values
-        X_train_flat = X_train_seq.reshape(-1, self.seq_length)
-        X_test_flat = X_test_seq.reshape(-1, self.seq_length)
+        X_train_flat = X_train_seq.reshape(-1, self.seqLen)
+        X_test_flat = X_test_seq.reshape(-1, self.seqLen)
 
         self.scaler.fit(X_train_flat)
         X_train_norm = self.scaler.transform(X_train_flat)
         X_test_norm = self.scaler.transform(X_test_flat)
 
         # reshape for LSTM/GRU
-        X_train_lstm = X_train_norm.reshape(-1, self.seq_length, 1)
-        X_test_lstm = X_test_norm.reshape(-1, self.seq_length, 1)
+        X_train_lstm = X_train_norm.reshape(-1, self.seqLen, 1)
+        X_test_lstm = X_test_norm.reshape(-1, self.seqLen, 1)
 
         # append time features for XGBoost
         X_train_xgb = np.column_stack([X_train_norm, timeTrain])
@@ -120,9 +120,9 @@ class RealTrafficPredictor:
             'y_test': y_test,
         }
 
-    def _build_lstm(self):
+    def _buildLSTM(self):
         model = Sequential([
-            Input(shape=(self.seq_length, 1)),
+            Input(shape=(self.seqLen, 1)),
             LSTM(128, return_sequences=True),
             Dropout(0.2),
             LSTM(64, return_sequences=True),
@@ -132,13 +132,13 @@ class RealTrafficPredictor:
             Dense(16, activation='relu'),
             Dense(1)
         ])
-        optimizer = Adam(learning_rate=self.learning_rate)
+        optimizer = Adam(learning_rate=self.lr)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
 
-    def _build_gru(self):
+    def _buildGRU(self):
         model = Sequential([
-            Input(shape=(self.seq_length, 1)),
+            Input(shape=(self.seqLen, 1)),
             GRU(128, return_sequences=True),
             Dropout(0.2),
             GRU(64, return_sequences=True),
@@ -148,17 +148,17 @@ class RealTrafficPredictor:
             Dense(16, activation='relu'),
             Dense(1)
         ])
-        optimizer = Adam(learning_rate=self.learning_rate)
+        optimizer = Adam(learning_rate=self.lr)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
 
-    def train_lstm(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
+    def trainLSTM(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
         if verbose:
             print("--- Training LSTM model ---")
             print(f"Training samples: {len(X_train)}")
             print(f"Validation samples: {len(X_test)}")
 
-        model = self._build_lstm()
+        model = self._buildLSTM()
 
         earlyStop = EarlyStopping(
             monitor='val_loss',
@@ -173,26 +173,26 @@ class RealTrafficPredictor:
             X_train, y_train,
             validation_data=(X_test, y_test),
             epochs=epochs,
-            batch_size=self.batch_size,
+            batch_size=self.batchSize,
             callbacks=[earlyStop],
             verbose=1 if verbose else 0
         )
 
         self.models['lstm'] = model
-        self.training_history['lstm'] = history.history
+        self.trainingHistory['lstm'] = history.history
 
         if verbose:
-            self._evaluate_model('lstm', model, X_test, y_test)
+            self._evalModel('lstm', model, X_test, y_test)
 
         return model
 
-    def train_gru(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
+    def trainGRU(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
         if verbose:
             print("--- Training GRU model ---")
             print(f"Training samples: {len(X_train)}")
             print(f"Validation samples: {len(X_test)}")
 
-        model = self._build_gru()
+        model = self._buildGRU()
 
         earlyStop = EarlyStopping(
             monitor='val_loss',
@@ -207,20 +207,20 @@ class RealTrafficPredictor:
             X_train, y_train,
             validation_data=(X_test, y_test),
             epochs=epochs,
-            batch_size=self.batch_size,
+            batch_size=self.batchSize,
             callbacks=[earlyStop],
             verbose=1 if verbose else 0
         )
 
         self.models['gru'] = model
-        self.training_history['gru'] = history.history
+        self.trainingHistory['gru'] = history.history
 
         if verbose:
-            self._evaluate_model('gru', model, X_test, y_test)
+            self._evalModel('gru', model, X_test, y_test)
 
         return model
 
-    def train_xgboost(self, X_train, y_train, X_test, y_test, verbose=True):
+    def trainXGB(self, X_train, y_train, X_test, y_test, verbose=True):
         if verbose:
             print("--- Training XGBoost model ---")
             print(f"Training samples: {len(X_train)}")
@@ -246,12 +246,12 @@ class RealTrafficPredictor:
         self.models['xgboost'] = model
 
         if verbose:
-            self._evaluate_model('xgboost', model, X_test, y_test)
-            self._print_feature_importance(model)
+            self._evalModel('xgboost', model, X_test, y_test)
+            self._printFeatureImportance(model)
 
         return model
 
-    def _evaluate_model(self, name, model, X_test, y_test):
+    def _evalModel(self, name, model, X_test, y_test):
         if name in ['lstm', 'gru']:
             yPred = model.predict(X_test, verbose=0).flatten()
         else:
@@ -266,65 +266,65 @@ class RealTrafficPredictor:
         print(f"  RMSE: {rmse:.2f} vehicles/15min")
         print(f"  R2:   {r2:.4f}")
 
-        if name not in self.training_history:
-            self.training_history[name] = {}
-        self.training_history[name]['test_mae'] = mae
-        self.training_history[name]['test_rmse'] = rmse
-        self.training_history[name]['test_r2'] = r2
+        if name not in self.trainingHistory:
+            self.trainingHistory[name] = {}
+        self.trainingHistory[name]['test_mae'] = mae
+        self.trainingHistory[name]['test_rmse'] = rmse
+        self.trainingHistory[name]['test_r2'] = r2
 
-    def _print_feature_importance(self, model):
+    def _printFeatureImportance(self, model):
         importance = model.feature_importances_
         print("\nXGBoost Feature Importance:")
-        print(f"  Past 12 traffic volumes: {importance[:self.seq_length].sum():.3f}")
-        if importance.shape[0] > self.seq_length:
-            print(f"  Hour of day:            {importance[self.seq_length]:.3f}")
-        if importance.shape[0] > self.seq_length + 1:
-            print(f"  Day of week:            {importance[self.seq_length + 1]:.3f}")
+        print(f"  Past 12 traffic volumes: {importance[:self.seqLen].sum():.3f}")
+        if importance.shape[0] > self.seqLen:
+            print(f"  Hour of day:            {importance[self.seqLen]:.3f}")
+        if importance.shape[0] > self.seqLen + 1:
+            print(f"  Day of week:            {importance[self.seqLen + 1]:.3f}")
 
-    def predict(self, model_name, last_sequence, hour_of_day=12, day_of_week=2):
+    def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
         # fall back to time-of-day heuristic if no model or sequence
-        if last_sequence is None:
-            return self._fallback_prediction(hour_of_day)
+        if lastSeq is None:
+            return self._fallbackPredict(hourOfDay)
 
-        if model_name not in self.models:
-            return self._fallback_prediction(hour_of_day)
+        if modelName not in self.models:
+            return self._fallbackPredict(hourOfDay)
 
-        model = self.models[model_name]
+        model = self.models[modelName]
 
         # pad or trim sequence to the right length
-        if len(last_sequence) < self.seq_length:
-            last_sequence = [last_sequence[-1]] * (self.seq_length - len(last_sequence)) + last_sequence
-        elif len(last_sequence) > self.seq_length:
-            last_sequence = last_sequence[-self.seq_length:]
+        if len(lastSeq) < self.seqLen:
+            lastSeq = [lastSeq[-1]] * (self.seqLen - len(lastSeq)) + lastSeq
+        elif len(lastSeq) > self.seqLen:
+            lastSeq = lastSeq[-self.seqLen:]
 
-        seqArray = np.array(last_sequence[-self.seq_length:]).reshape(1, -1)
+        seqArray = np.array(lastSeq[-self.seqLen:]).reshape(1, -1)
         seqNorm = self.scaler.transform(seqArray)
 
-        if model_name in ['lstm', 'gru']:
-            seqInput = seqNorm.reshape(1, self.seq_length, 1)
+        if modelName in ['lstm', 'gru']:
+            seqInput = seqNorm.reshape(1, self.seqLen, 1)
             predNorm = model.predict(seqInput, verbose=0)[0, 0]
             predVolume = predNorm * self.scaler.scale_[0] + self.scaler.mean_[0]
         else:  # xgboost
-            timeFeatures = np.array([[hour_of_day, day_of_week]])
+            timeFeatures = np.array([[hourOfDay, dayOfWeek]])
             features = np.column_stack([seqNorm, timeFeatures])
             predVolume = model.predict(features)[0]
 
         return max(5, int(predVolume))
 
-    def _fallback_prediction(self, hour_of_day):
+    def _fallbackPredict(self, hourOfDay):
         # rough hourly traffic profile when no model is available
-        if 7 <= hour_of_day <= 9:
-            return 180 + (hour_of_day - 7) * 50
-        elif 16 <= hour_of_day <= 19:
-            return 160 + (hour_of_day - 16) * 40
-        elif hour_of_day >= 22 or hour_of_day <= 5:
+        if 7 <= hourOfDay <= 9:
+            return 180 + (hourOfDay - 7) * 50
+        elif 16 <= hourOfDay <= 19:
+            return 160 + (hourOfDay - 16) * 40
+        elif hourOfDay >= 22 or hourOfDay <= 5:
             return 30
-        elif 10 <= hour_of_day <= 15:
+        elif 10 <= hourOfDay <= 15:
             return 100
         else:
             return 70
 
-    def save_models(self, folder='saved_models'):
+    def saveModels(self, folder='saved_models'):
         os.makedirs(folder, exist_ok=True)
 
         if 'lstm' in self.models:
@@ -342,7 +342,7 @@ class RealTrafficPredictor:
         joblib.dump(self.scaler, f'{folder}/scaler.joblib')
         print(f"Scaler saved to {folder}/scaler.joblib")
 
-    def load_models(self, folder='saved_models'):
+    def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
             print(f"Folder {folder} not found. Will train new models.")
             return False
@@ -353,7 +353,7 @@ class RealTrafficPredictor:
         if os.path.exists(lstmPath):
             self.models['lstm'] = load_model(lstmPath, compile=False)
             # recompile so we can keep training later if needed
-            self.models['lstm'].compile(optimizer=Adam(learning_rate=self.learning_rate),
+            self.models['lstm'].compile(optimizer=Adam(learning_rate=self.lr),
                                         loss='mse', metrics=['mae'])
             print(f"LSTM model loaded from {lstmPath}")
             loaded = True
@@ -361,7 +361,7 @@ class RealTrafficPredictor:
         gruPath = f'{folder}/gru_model.keras'
         if os.path.exists(gruPath):
             self.models['gru'] = load_model(gruPath, compile=False)
-            self.models['gru'].compile(optimizer=Adam(learning_rate=self.learning_rate),
+            self.models['gru'].compile(optimizer=Adam(learning_rate=self.lr),
                                        loss='mse', metrics=['mae'])
             print(f"GRU model loaded from {gruPath}")
             loaded = True
@@ -380,33 +380,33 @@ class RealTrafficPredictor:
         return loaded
 
 
-def train_all_models():
+def trainAllModels():
     print("--- Training all traffic prediction models ---")
 
-    predictor = RealTrafficPredictor(seq_length=12, batch_size=32, learning_rate=0.001)
+    predictor = RealTrafficPredictor(seqLen=12, batchSize=32, lr=0.001)
 
-    data = predictor.load_data_from_excel('Scats Data October 2006.xls')
+    data = predictor.loadData('Scats Data October 2006.xls')
 
     print("\nStarting training (this may take 5-10 minutes)...")
 
-    predictor.train_lstm(
+    predictor.trainLSTM(
         data['X_train_lstm'], data['y_train'],
         data['X_test_lstm'], data['y_test'],
         epochs=30
     )
 
-    predictor.train_gru(
+    predictor.trainGRU(
         data['X_train_lstm'], data['y_train'],
         data['X_test_lstm'], data['y_test'],
         epochs=30
     )
 
-    predictor.train_xgboost(
+    predictor.trainXGB(
         data['X_train_xgb'], data['y_train'],
         data['X_test_xgb'], data['y_test']
     )
 
-    predictor.save_models()
+    predictor.saveModels()
 
     print("--- Training complete. Models saved in 'saved_models/' ---")
 
@@ -414,4 +414,4 @@ def train_all_models():
 
 
 if __name__ == "__main__":
-    predictor = train_all_models()
+    predictor = trainAllModels()

@@ -12,52 +12,52 @@ class TBRGSGUI:
         self.map_viewer = map_viewer
         self.pathfinder = pathfinder
 
-        self.current_model = tk.StringVar(value='lstm')
-        self.origin_var = tk.StringVar()
-        self.dest_var = tk.StringVar()
+        self.currentModel = tk.StringVar(value='lstm')
+        self.originVar = tk.StringVar()
+        self.destVar = tk.StringVar()
         self.time_var = tk.StringVar(value="12:00")
 
-        self.map_widget = None
-        self.results_text = None
-        self.status_var = None
-        self.current_paths = []
+        self.mapWidget = None
+        self.resultsText = None
+        self.statusVar = None
+        self.currentPaths = []
 
-        self._setup_window()
-        self._build_gui()
+        self._setupWindow()
+        self._buildGui()
 
-        if self.map_viewer.is_map_available():
-            self._init_map()
+        if self.map_viewer.mapAvailable():
+            self._initMap()
         else:
-            self._show_map_unavailable()
+            self._showMapUnavail()
 
-    def _setup_window(self):
+    def _setupWindow(self):
         self.root.title("TBRGS - Traffic-Based Route Guidance System")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.configure(bg='#f0f0f0')
 
-    def _build_gui(self):
+    def _buildGui(self):
         leftPanel = tk.Frame(self.root, bg='#f0f0f0', width=LEFT_PANEL_WIDTH)
         leftPanel.pack(side='left', fill='both', expand=False, padx=(10, 5), pady=10)
         leftPanel.pack_propagate(False)
 
-        self.right_panel = tk.Frame(self.root, bg='#ffffff', bd=2, relief='sunken')
-        self.right_panel.pack(side='right', fill='both', expand=True, padx=(5, 10), pady=10)
+        self.rightPanel = tk.Frame(self.root, bg='#ffffff', bd=2, relief='sunken')
+        self.rightPanel.pack(side='right', fill='both', expand=True, padx=(5, 10), pady=10)
 
         tk.Label(leftPanel, text="TRAFFIC-BASED ROUTE GUIDANCE",
                 font=('Arial', 14, 'bold'), bg='#f0f0f0', fg='#1a237e').pack(pady=(0, 5))
 
-        self.status_var = tk.StringVar(value="")
-        tk.Label(leftPanel, textvariable=self.status_var, font=('Arial', 9),
+        self.statusVar = tk.StringVar(value="")
+        tk.Label(leftPanel, textvariable=self.statusVar, font=('Arial', 9),
                 bg='#f0f0f0', fg='#2e7d32', wraplength=LEFT_PANEL_WIDTH-20,
                 justify='left').pack(fill='x', padx=10, pady=(0, 10))
 
-        self._build_input_frame(leftPanel)
-        self._build_model_frame(leftPanel)
-        self._build_button_frame(leftPanel)
-        self._build_route_selector(leftPanel)
-        self._build_results_frame(leftPanel)
+        self._buildInputFrame(leftPanel)
+        self._buildModelFrame(leftPanel)
+        self._buildBtnFrame(leftPanel)
+        self._buildRouteSelector(leftPanel)
+        self._buildResultsFrame(leftPanel)
 
-    def _build_input_frame(self, parent):
+    def _buildInputFrame(self, parent):
         inputFrame = tk.LabelFrame(parent, text="Trip Information",
                                     font=('Arial', 11, 'bold'),
                                     bg='#f0f0f0', padx=10, pady=10)
@@ -65,16 +65,16 @@ class TBRGSGUI:
 
         tk.Label(inputFrame, text="Origin SCATS:", font=('Arial', 10),
                 bg='#f0f0f0').grid(row=0, column=0, sticky='w', pady=5)
-        self.origin_combo = ttk.Combobox(inputFrame, textvariable=self.origin_var, width=20)
-        self.origin_combo.grid(row=0, column=1, pady=5, padx=(10, 0))
-        tk.Button(inputFrame, text="Locate", command=self._locate_origin,
+        self.originCombo = ttk.Combobox(inputFrame, textvariable=self.originVar, width=20)
+        self.originCombo.grid(row=0, column=1, pady=5, padx=(10, 0))
+        tk.Button(inputFrame, text="Locate", command=self._locateOrigin,
                  font=('Arial', 8), width=6).grid(row=0, column=2, padx=5)
 
         tk.Label(inputFrame, text="Destination SCATS:", font=('Arial', 10),
                 bg='#f0f0f0').grid(row=1, column=0, sticky='w', pady=5)
-        self.dest_combo = ttk.Combobox(inputFrame, textvariable=self.dest_var, width=20)
-        self.dest_combo.grid(row=1, column=1, pady=5, padx=(10, 0))
-        tk.Button(inputFrame, text="Locate", command=self._locate_destination,
+        self.destCombo = ttk.Combobox(inputFrame, textvariable=self.destVar, width=20)
+        self.destCombo.grid(row=1, column=1, pady=5, padx=(10, 0))
+        tk.Button(inputFrame, text="Locate", command=self._locateDest,
                  font=('Arial', 8), width=6).grid(row=1, column=2, padx=5)
 
         tk.Label(inputFrame, text="Departure Time:", font=('Arial', 10),
@@ -84,7 +84,7 @@ class TBRGSGUI:
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
 
-    def _build_model_frame(self, parent):
+    def _buildModelFrame(self, parent):
         modelFrame = tk.LabelFrame(parent, text="ML Model Selection",
                                     font=('Arial', 11, 'bold'),
                                     bg='#f0f0f0', padx=10, pady=10)
@@ -92,11 +92,11 @@ class TBRGSGUI:
 
         models = [('LSTM', 'lstm'), ('GRU', 'gru'), ('XGBoost', 'xgboost')]
         for i, (text, value) in enumerate(models):
-            tk.Radiobutton(modelFrame, text=text, variable=self.current_model,
+            tk.Radiobutton(modelFrame, text=text, variable=self.currentModel,
                           value=value, font=('Arial', 10), bg='#f0f0f0').grid(
                           row=0, column=i, padx=20, pady=5)
 
-    def _build_button_frame(self, parent):
+    def _buildBtnFrame(self, parent):
         btnFrame = tk.Frame(parent, bg='#f0f0f0')
         btnFrame.pack(fill='x', pady=(0, 10))
 
@@ -104,13 +104,13 @@ class TBRGSGUI:
         row1.pack(fill='x', pady=(0, 5))
 
         tk.Button(row1, text="FIND ROUTES",
-                  command=self.find_routes,
+                  command=self.findRoutes,
                   bg='#2e7d32', fg='white',
                   font=('Arial', 11, 'bold'),
                   padx=20, pady=5).pack(side='left', padx=5)
 
         tk.Button(row1, text="CLEAR MAP",
-                  command=self.clear_route,
+                  command=self.clearRoute,
                   bg='#ef6c00', fg='white',
                   font=('Arial', 10),
                   padx=15, pady=5).pack(side='left', padx=5)
@@ -119,98 +119,98 @@ class TBRGSGUI:
         row2.pack(fill='x')
 
         tk.Button(row2, text="COMPARE ALGORITHMS",
-                  command=self.compare_algorithms,
+                  command=self.compareAlgos,
                   bg='#9c27b0', fg='white',
                   font=('Arial', 10),
                   padx=15, pady=5).pack(side='left', padx=5)
 
-    def _build_route_selector(self, parent):
-        self.route_selector_frame = tk.LabelFrame(parent, text="Display Route",
+    def _buildRouteSelector(self, parent):
+        self.routeSelectorFrame = tk.LabelFrame(parent, text="Display Route",
                                                    font=('Arial', 11, 'bold'),
                                                    bg='#f0f0f0', padx=10, pady=5)
-        self.route_selector_frame.pack(fill='x', pady=(0, 10))
-        self.route_buttons_row = tk.Frame(self.route_selector_frame, bg='#f0f0f0')
-        self.route_buttons_row.pack(fill='x')
-        tk.Label(self.route_selector_frame, text="Find routes to see options.",
+        self.routeSelectorFrame.pack(fill='x', pady=(0, 10))
+        self.routeBtnsRow = tk.Frame(self.routeSelectorFrame, bg='#f0f0f0')
+        self.routeBtnsRow.pack(fill='x')
+        tk.Label(self.routeSelectorFrame, text="Find routes to see options.",
                  font=('Arial', 9), bg='#f0f0f0', fg='#888888').pack()
 
-    def _build_results_frame(self, parent):
+    def _buildResultsFrame(self, parent):
         resultsFrame = tk.LabelFrame(parent, text="Route Results (Top-K Routes)",
                                       font=('Arial', 11, 'bold'),
                                       bg='#f0f0f0', padx=10, pady=10)
         resultsFrame.pack(fill='both', expand=True)
 
-        self.results_text = scrolledtext.ScrolledText(resultsFrame, height=14,
+        self.resultsText = scrolledtext.ScrolledText(resultsFrame, height=14,
                                                        width=55, font=('Courier', 9))
-        self.results_text.pack(fill='both', expand=True)
+        self.resultsText.pack(fill='both', expand=True)
 
-    def _init_map(self):
-        self.map_widget = self.map_viewer.create_map(self.right_panel)
-        self.map_viewer.draw_network()
-        self._update_site_lists()
+    def _initMap(self):
+        self.mapWidget = self.map_viewer.createMap(self.rightPanel)
+        self.map_viewer.drawNetwork()
+        self._updateSiteLists()
 
-    def _show_map_unavailable(self):
-        tk.Label(self.right_panel,
+    def _showMapUnavail(self):
+        tk.Label(self.rightPanel,
                 text="Map visualization unavailable.\n\nPlease install tkintermapview:\npip install tkintermapview",
                 font=('Arial', 12), bg='#ffffff', fg='#ff0000').pack(expand=True)
 
-    def _update_site_lists(self):
+    def _updateSiteLists(self):
         # fill both dropdowns with available SCATS sites
-        sites = self.map_viewer.get_available_sites()
-        self.origin_combo['values'] = sites
-        self.dest_combo['values'] = sites
+        sites = self.map_viewer.getSites()
+        self.originCombo['values'] = sites
+        self.destCombo['values'] = sites
         if len(sites) >= 2:
-            self.origin_combo.set(str(sites[0]))
-            self.dest_combo.set(str(sites[1]))
+            self.originCombo.set(str(sites[0]))
+            self.destCombo.set(str(sites[1]))
 
-    def _locate_origin(self):
-        site = self.origin_var.get()
+    def _locateOrigin(self):
+        site = self.originVar.get()
         if site:
-            self.map_viewer.locate_site(site)
-            self.status_var.set(f"Located SCATS {site}")
+            self.map_viewer.locateSite(site)
+            self.statusVar.set(f"Located SCATS {site}")
 
-    def _locate_destination(self):
-        site = self.dest_var.get()
+    def _locateDest(self):
+        site = self.destVar.get()
         if site:
-            self.map_viewer.locate_site(site)
-            self.status_var.set(f"Located SCATS {site}")
+            self.map_viewer.locateSite(site)
+            self.statusVar.set(f"Located SCATS {site}")
 
-    def _populate_route_buttons(self):
-        for w in self.route_buttons_row.winfo_children():
+    def _populateRouteBtns(self):
+        for w in self.routeBtnsRow.winfo_children():
             w.destroy()
-        for w in self.route_selector_frame.winfo_children():
+        for w in self.routeSelectorFrame.winfo_children():
             if isinstance(w, tk.Label):
                 w.destroy()
 
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
-        for i, (_, total_time, _) in enumerate(self.current_paths):
+        for i, (_, total_time, _) in enumerate(self.currentPaths):
             color = routeColors[i % len(routeColors)]
-            btn = tk.Button(self.route_buttons_row,
+            btn = tk.Button(self.routeBtnsRow,
                             text=f"Route {i+1}",
-                            command=lambda idx=i: self._select_route(idx),
+                            command=lambda idx=i: self._selectRoute(idx),
                             bg=color, fg='white',
                             font=('Arial', 9, 'bold'),
                             padx=8, pady=3,
                             relief='sunken' if i == 0 else 'raised')
             btn.pack(side='left', padx=3, pady=3)
 
-    def _select_route(self, idx):
+    def _selectRoute(self, idx):
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
-        path, _, _ = self.current_paths[idx]
-        self.map_viewer.clear_route()
-        self.map_viewer.draw_route(path, color=routeColors[idx % len(routeColors)], is_best=True)
-        for i, btn in enumerate(self.route_buttons_row.winfo_children()):
+        path, _, _ = self.currentPaths[idx]
+        self.map_viewer.clearRoute()
+        self.map_viewer.drawRoute(path, color=routeColors[idx % len(routeColors)], isBest=True)
+        for i, btn in enumerate(self.routeBtnsRow.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
-    def clear_route(self):
-        self.map_viewer.clear_route()
-        self.results_text.delete(1.0, tk.END)
-        self.status_var.set("Route cleared from map.")
+    def clearRoute(self):
+        self.map_viewer.clearRoute()
+        self.resultsText.delete(1.0, tk.END)
+        self.statusVar.set("Route cleared from map.")
 
-    def get_user_input(self):
+    def getUserInput(self):
         # grab and validate origin/dest/time from the form
-        originStr = self.origin_var.get()
-        destStr = self.dest_var.get()
+        originStr = self.originVar.get()
+        destStr = self.destVar.get()
 
         if not originStr or not destStr:
             messagebox.showwarning("Input Error", "Select origin and destination")
@@ -236,50 +236,50 @@ class TBRGSGUI:
 
         return origin, dest, hour
 
-    def find_routes(self):
+    def findRoutes(self):
         # run all 6 algorithms and collect up to 5 unique routes
-        origin, dest, hour = self.get_user_input()
+        origin, dest, hour = self.getUserInput()
         if origin is None:
             return
 
-        modelName = self.current_model.get()
+        modelName = self.currentModel.get()
 
-        self.status_var.set(f"Finding routes from {origin} to {dest} using all algorithms "
+        self.statusVar.set(f"Finding routes from {origin} to {dest} using all algorithms "
                             f"with {modelName.upper()}...")
         self.root.update()
 
-        self.results_text.delete(1.0, tk.END)
-        self.map_viewer.clear_route()
+        self.resultsText.delete(1.0, tk.END)
+        self.map_viewer.clearRoute()
 
-        self.pathfinder.set_model(modelName)
+        self.pathfinder.setModel(modelName)
 
-        paths = self.pathfinder.find_unique_paths_all_algorithms(origin, dest, hour, max_paths=5)
+        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5)
 
-        self.current_paths = paths
+        self.currentPaths = paths
         if paths:
             bestAlgos = " & ".join(a.upper() for a in paths[0][2])
-            self.status_var.set(f"Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({bestAlgos})")
+            self.statusVar.set(f"Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({bestAlgos})")
         else:
-            self.status_var.set("No routes found. Try different origin/destination.")
-        self._populate_route_buttons()
+            self.statusVar.set("No routes found. Try different origin/destination.")
+        self._populateRouteBtns()
         if paths:
-            self._select_route(0)
+            self._selectRoute(0)
 
-        self._display_results(origin, dest, hour, modelName, paths)
+        self._displayResults(origin, dest, hour, modelName, paths)
 
-    def _display_results(self, origin, dest, hour, modelName, paths):
+    def _displayResults(self, origin, dest, hour, modelName, paths):
         SEP = "=" * 40
-        self.results_text.insert(tk.END, SEP + "\n")
-        self.results_text.insert(tk.END, "TBRGS ROUTE RESULTS\n")
-        self.results_text.insert(tk.END, SEP + "\n")
-        self.results_text.insert(tk.END, f"Origin:    SCATS {origin}\n")
-        self.results_text.insert(tk.END, f"Dest:      SCATS {dest}\n")
-        self.results_text.insert(tk.END, f"Departure: {self.time_var.get()} (Hour {hour}:00)\n")
-        self.results_text.insert(tk.END, f"ML Model:  {modelName.upper()}\n")
-        self.results_text.insert(tk.END, SEP + "\n\n")
+        self.resultsText.insert(tk.END, SEP + "\n")
+        self.resultsText.insert(tk.END, "TBRGS ROUTE RESULTS\n")
+        self.resultsText.insert(tk.END, SEP + "\n")
+        self.resultsText.insert(tk.END, f"Origin:    SCATS {origin}\n")
+        self.resultsText.insert(tk.END, f"Dest:      SCATS {dest}\n")
+        self.resultsText.insert(tk.END, f"Departure: {self.time_var.get()} (Hour {hour}:00)\n")
+        self.resultsText.insert(tk.END, f"ML Model:  {modelName.upper()}\n")
+        self.resultsText.insert(tk.END, SEP + "\n\n")
 
         if not paths:
-            self.results_text.insert(tk.END, "No routes found!\n\n")
+            self.resultsText.insert(tk.END, "No routes found!\n\n")
             return
 
         algoDisplay = {
@@ -287,13 +287,13 @@ class TBRGSGUI:
             'dijkstra': "Dijkstra's", 'greedy': 'Greedy', 'bfs': 'BFS', 'dfs': 'DFS'
         }
 
-        self.results_text.insert(tk.END, f"Found {len(paths)} unique route(s):\n\n")
+        self.resultsText.insert(tk.END, f"Found {len(paths)} unique route(s):\n\n")
 
         for i, (path, total_time, algos) in enumerate(paths, 1):
             algoNames = " & ".join(algoDisplay.get(a, a) for a in algos)
-            self.results_text.insert(tk.END, "─" * 40 + "\n")
-            self.results_text.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
-            self.results_text.insert(tk.END, f"By: {algoNames}\n\n")
+            self.resultsText.insert(tk.END, "─" * 40 + "\n")
+            self.resultsText.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
+            self.resultsText.insert(tk.END, f"By: {algoNames}\n\n")
 
             # wrap node list so it fits the text box
             nodes = [str(n) for n in path]
@@ -301,40 +301,40 @@ class TBRGSGUI:
             currLen = 0
             for node in nodes:
                 if currLen + len(node) + 4 > 40:
-                    self.results_text.insert(tk.END, "  " + " → ".join(currLine) + "\n")
+                    self.resultsText.insert(tk.END, "  " + " → ".join(currLine) + "\n")
                     currLine = [node]
                     currLen = len(node)
                 else:
                     currLine.append(node)
                     currLen += len(node) + 4
             if currLine:
-                self.results_text.insert(tk.END, "  " + " → ".join(currLine) + "\n")
+                self.resultsText.insert(tk.END, "  " + " → ".join(currLine) + "\n")
 
-            self.results_text.insert(tk.END, "\n")
+            self.resultsText.insert(tk.END, "\n")
 
-        self.results_text.insert(tk.END, SEP + "\n")
+        self.resultsText.insert(tk.END, SEP + "\n")
 
-    def compare_algorithms(self):
-        origin, dest, hour = self.get_user_input()
+    def compareAlgos(self):
+        origin, dest, hour = self.getUserInput()
         if origin is None:
             return
 
-        modelName = self.current_model.get()
+        modelName = self.currentModel.get()
 
-        self.status_var.set(f"Comparing all algorithms from {origin} to {dest}...")
+        self.statusVar.set(f"Comparing all algorithms from {origin} to {dest}...")
         self.root.update()
 
-        self.results_text.delete(1.0, tk.END)
+        self.resultsText.delete(1.0, tk.END)
 
         SEP = "=" * 40
-        self.results_text.insert(tk.END, SEP + "\n")
-        self.results_text.insert(tk.END, "ALGORITHM COMPARISON\n")
-        self.results_text.insert(tk.END, SEP + "\n")
-        self.results_text.insert(tk.END, f"Origin: {origin}  Dest: {dest}\n")
-        self.results_text.insert(tk.END, f"Time: {self.time_var.get()}  Model: {modelName.upper()}\n\n")
+        self.resultsText.insert(tk.END, SEP + "\n")
+        self.resultsText.insert(tk.END, "ALGORITHM COMPARISON\n")
+        self.resultsText.insert(tk.END, SEP + "\n")
+        self.resultsText.insert(tk.END, f"Origin: {origin}  Dest: {dest}\n")
+        self.resultsText.insert(tk.END, f"Time: {self.time_var.get()}  Model: {modelName.upper()}\n\n")
 
-        self.results_text.insert(tk.END, f"{'Algorithm':<16} {'min':<8} {'Nodes':<7} \n")
-        self.results_text.insert(tk.END, "-" * 40 + "\n")
+        self.resultsText.insert(tk.END, f"{'Algorithm':<16} {'min':<8} {'Nodes':<7} \n")
+        self.resultsText.insert(tk.END, "-" * 40 + "\n")
 
         algorithms = ['astar', 'bidirectional', 'dijkstra', 'greedy', 'bfs', 'dfs']
         algoNames = ['A*', 'Bidir A*', 'Dijkstra', 'Greedy', 'BFS', 'DFS']
@@ -343,21 +343,21 @@ class TBRGSGUI:
         bestAlgo = None
 
         for algo, name in zip(algorithms, algoNames):
-            self.pathfinder.set_algorithm(algo)
-            self.pathfinder.set_model(modelName)
-            path, cost, nodes = self.pathfinder.find_path(origin, dest, hour)
+            self.pathfinder.setAlgorithm(algo)
+            self.pathfinder.setModel(modelName)
+            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour)
 
             if path:
-                self.results_text.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")
+                self.resultsText.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")
                 if cost < bestTime:
                     bestTime = cost
                     bestAlgo = name
             else:
-                self.results_text.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} N\n")
+                self.resultsText.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} N\n")
 
-        self.results_text.insert(tk.END, "-" * 40 + "\n")
+        self.resultsText.insert(tk.END, "-" * 40 + "\n")
         if bestAlgo:
-            self.results_text.insert(tk.END, f"\nBest: {bestAlgo} ({bestTime:.1f} min)\n")
+            self.resultsText.insert(tk.END, f"\nBest: {bestAlgo} ({bestTime:.1f} min)\n")
 
-        self.results_text.insert(tk.END, "\n" + SEP + "\n")
-        self.status_var.set(f"Comparison complete. Best: {bestAlgo} ({bestTime:.1f} min)")
+        self.resultsText.insert(tk.END, "\n" + SEP + "\n")
+        self.statusVar.set(f"Comparison complete. Best: {bestAlgo} ({bestTime:.1f} min)")

@@ -2,7 +2,7 @@
 import math
 
 
-def haversine_distance(lat1, lon1, lat2, lon2):
+def haversineDistance(lat1, lon1, lat2, lon2):
     R = 6371
     lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
     lat2_r, lon2_r = math.radians(lat2), math.radians(lon2)
@@ -12,7 +12,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 
-def build_graph(connections, coords):
+def buildGraph(connections, coords):
     # start with every node having an empty neighbour list
     graph = {node: [] for node in set(connections) | {n for nbrs in connections.values() for n in nbrs}}
 
@@ -22,7 +22,7 @@ def build_graph(connections, coords):
         for neighbor in neighbors:
             if neighbor not in coords:
                 continue
-            distance = haversine_distance(*coords[node], *coords[neighbor])
+            distance = haversineDistance(*coords[node], *coords[neighbor])
             # skip edges that are implausibly short or long
             if 0.1 <= distance <= 10.0:
                 graph[node].append((neighbor, round(distance, 3)))
@@ -30,7 +30,7 @@ def build_graph(connections, coords):
     return graph
 
 
-def get_graph_info(graph):
+def getGraphInfo(graph):
     return {
         'total_nodes': len(graph),
         'total_edges': sum(len(v) for v in graph.values()) // 2,

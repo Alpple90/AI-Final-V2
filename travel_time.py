@@ -12,7 +12,7 @@ from config import (
 _INTERSECTION_DELAY_MIN = INTERSECTION_DELAY_SEC / 60
 
 
-def flow_to_speed(flowPerHour):
+def flowToSpeed(flowPerHour):
     # free flow below threshold, otherwise use quadratic model
     if flowPerHour <= FREE_FLOW_THRESHOLD:
         return SPEED_LIMIT_KPH
@@ -35,8 +35,8 @@ def flow_to_speed(flowPerHour):
     return min(speeds)
 
 
-def calculate_travel_time(distanceKm, flowPer15min):
-    speed = min(flow_to_speed(flowPer15min * 4), SPEED_LIMIT_KPH)
+def calcTravelTime(distanceKm, flowPer15min):
+    speed = min(flowToSpeed(flowPer15min * 4), SPEED_LIMIT_KPH)
     if speed <= 0.1:
         return 999
     return round((distanceKm / speed) * 60 + _INTERSECTION_DELAY_MIN, 2)

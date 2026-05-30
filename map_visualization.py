@@ -20,14 +20,14 @@ except ImportError:
 class SCATSMapViewer:
 
     def __init__(self):
-        self.map_widget = None
+        self.mapWidget = None
         self.coords = {}
         self.markers = {}
-        self.current_route_items = []
-        self.network_paths = []
-        self.is_initialized = False
+        self.currentRouteItems = []
+        self.networkPaths = []
+        self.isInitialized = False
 
-    def load_coordinates(self):
+    def loadCoords(self):
         sitesDF = load_sites()
         self.coords = {
             row['SCATS Number']: (row['LAT'], row['LNG'])
@@ -36,36 +36,36 @@ class SCATSMapViewer:
         print(f"Loaded {len(self.coords)} SCATS sites with coordinates")
         return self.coords
 
-    def get_available_sites(self):
+    def getSites(self):
         return sorted([s for s in self.coords.keys() if s.isdigit()], key=int)
 
-    def create_map(self, parent_frame):
+    def createMap(self, parentFrame):
         if not MAP_AVAILABLE:
             return None
 
-        self.map_widget = tkintermapview.TkinterMapView(parent_frame, corner_radius=0)
-        self.map_widget.pack(fill='both', expand=True)
-        self.map_widget.set_tile_server(MAP_TILE_SERVER)
+        self.mapWidget = tkintermapview.TkinterMapView(parentFrame, corner_radius=0)
+        self.mapWidget.pack(fill='both', expand=True)
+        self.mapWidget.set_tile_server(MAP_TILE_SERVER)
 
         # centre on Boroondara
         if self.coords:
             lats = [c[0] for c in self.coords.values()]
             lngs = [c[1] for c in self.coords.values()]
-            self.map_widget.set_position(sum(lats)/len(lats), sum(lngs)/len(lngs))
-            self.map_widget.set_zoom(MAP_ZOOM_LEVEL)
+            self.mapWidget.set_position(sum(lats)/len(lats), sum(lngs)/len(lngs))
+            self.mapWidget.set_zoom(MAP_ZOOM_LEVEL)
 
-        return self.map_widget
+        return self.mapWidget
 
-    def draw_network(self):
-        if not self.map_widget or not self.coords:
+    def drawNetwork(self):
+        if not self.mapWidget or not self.coords:
             return
 
-        self.network_paths = draw_edges(self.map_widget, self.coords)
+        self.networkPaths = draw_edges(self.mapWidget, self.coords)
         self.network_visible = True
 
         for sid, (lat, lng) in self.coords.items():
             colour = NODE_COLOURS.get(sid, '#1a1a2e')
-            marker = self.map_widget.set_marker(
+            marker = self.mapWidget.set_marker(
                 lat, lng,
                 text=sid,
                 marker_color_circle=colour,
@@ -74,18 +74,18 @@ class SCATSMapViewer:
             )
             self.markers[sid] = marker
 
-        self.is_initialized = True
+        self.isInitialized = True
 
-    def locate_site(self, site_str):
-        if not self.map_widget or site_str not in self.coords:
+    def locateSite(self, siteStr):
+        if not self.mapWidget or siteStr not in self.coords:
             return False
-        lat, lng = self.coords[site_str]
-        self.map_widget.set_position(lat, lng)
-        self.map_widget.set_zoom(MAP_LOCATE_ZOOM)
+        lat, lng = self.coords[siteStr]
+        self.mapWidget.set_position(lat, lng)
+        self.mapWidget.set_zoom(MAP_LOCATE_ZOOM)
         return True
 
-    def draw_route(self, path, color='#ff6f00', is_best=False):
-        if not self.map_widget or len(path) < 2:
+    def drawRoute(self, path, color='#ff6f00', isBest=False):
+        if not self.mapWidget or len(path) < 2:
             return
 
         for i in range(len(path) - 1):
@@ -93,15 +93,15 @@ class SCATSMapViewer:
             if node1 in self.coords and node2 in self.coords:
                 lat1, lng1 = self.coords[node1]
                 lat2, lng2 = self.coords[node2]
-                line = self.map_widget.set_path(
+                line = self.mapWidget.set_path(
                     [(lat1, lng1), (lat2, lng2)],
                     color=color,
-                    width=5 if is_best else 3
+                    width=5 if isBest else 3
                 )
-                self.current_route_items.append(line)
+                self.currentRouteItems.append(line)
 
         # highlight start/end markers
-        if is_best:
+        if isBest:
             for nodeStr, markerColour, label in [
                 (str(path[0]),  '#2e7d32', f"{path[0]} [START]"),
                 (str(path[-1]), '#c62828', f"{path[-1]} [END]"),
@@ -113,7 +113,7 @@ class SCATSMapViewer:
                 except:
                     pass
                 lat, lng = self.coords[nodeStr]
-                m = self.map_widget.set_marker(
+                m = self.mapWidget.set_marker(
                     lat, lng,
                     text=label,
                     marker_color_circle=markerColour,
@@ -121,11 +121,11 @@ class SCATSMapViewer:
                     font=('Arial', 12, 'bold')
                 )
                 self.markers[nodeStr] = m
-                self.current_route_items.append((nodeStr, m))
+                self.currentRouteItems.append((nodeStr, m))
 
-    def clear_route(self):
+    def clearRoute(self):
         highlightedNodes = set()
-        for item in self.current_route_items:
+        for item in self.currentRouteItems:
             if isinstance(item, tuple):
                 nodeStr, marker = item
                 highlightedNodes.add(nodeStr)
@@ -138,16 +138,16 @@ class SCATSMapViewer:
                     item.delete()
                 except:
                     pass
-        self.current_route_items = []
+        self.currentRouteItems = []
 
         # put original markers back for any nodes we highlighted
-        if self.is_initialized:
+        if self.isInitialized:
             for sid in highlightedNodes:
                 if sid not in self.coords:
                     continue
                 lat, lng = self.coords[sid]
                 colour = NODE_COLOURS.get(sid, '#1a1a2e')
-                self.markers[sid] = self.map_widget.set_marker(
+                self.markers[sid] = self.mapWidget.set_marker(
                     lat, lng,
                     text=sid,
                     marker_color_circle=colour,
@@ -155,14 +155,14 @@ class SCATSMapViewer:
                     font=('Arial', 10, 'bold')
                 )
 
-    def is_map_available(self):
+    def mapAvailable(self):
         return MAP_AVAILABLE
 
-    def get_node_connections(self):
+    def getNodeConnections(self):
         return NODE_CONNECTIONS
 
-    def get_node_colours(self):
+    def getNodeColours(self):
         return NODE_COLOURS
 
-    def get_coords(self):
+    def getCoords(self):
         return self.coords
