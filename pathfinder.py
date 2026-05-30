@@ -202,28 +202,29 @@ class PathFinder:
             return None, float('inf'), 0
         
         forward_pq = [(self._heuristic(start_str, goal_str), 0, start_str, [start_str], 0)]
-        forward_visited = {start_str: (0, [start_str])}
+        forward_visited = {}
         backward_pq = [(self._heuristic(goal_str, start_str), 0, goal_str, [goal_str], 0)]
-        backward_visited = {goal_str: (0, [goal_str])}
-        
+        backward_visited = {}
+
         nodes_explored = 0
         best_path = None
         best_cost = float('inf')
         counter = 0
-        
+
         while forward_pq and backward_pq:
-            if forward_pq:
-                _, _, current, path, cost = heappop(forward_pq)
-                nodes_explored += 1
+            # Forward step
+            _, _, current, path, cost = heappop(forward_pq)
+            nodes_explored += 1
+            if current in forward_visited and forward_visited[current][0] <= cost:
+                pass
+            else:
+                forward_visited[current] = (cost, path)
                 if current in backward_visited:
                     back_cost, back_path = backward_visited[current]
                     total_cost = cost + back_cost
                     if total_cost < best_cost:
                         best_cost = total_cost
                         best_path = [int(n) for n in (path[:-1] + back_path[::-1])]
-                if current in forward_visited and forward_visited[current][0] <= cost:
-                    continue
-                forward_visited[current] = (cost, path)
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
@@ -232,19 +233,20 @@ class PathFinder:
                     h = self._heuristic(neighbor, goal_str)
                     counter += 1
                     heappush(forward_pq, (new_cost + h, counter, neighbor, path + [neighbor], new_cost))
-            
-            if backward_pq:
-                _, _, current, path, cost = heappop(backward_pq)
-                nodes_explored += 1
+
+            # Backward step
+            _, _, current, path, cost = heappop(backward_pq)
+            nodes_explored += 1
+            if current in backward_visited and backward_visited[current][0] <= cost:
+                pass
+            else:
+                backward_visited[current] = (cost, path)
                 if current in forward_visited:
-                    forward_cost, forward_path = forward_visited[current]
-                    total_cost = forward_cost + cost
+                    fwd_cost, fwd_path = forward_visited[current]
+                    total_cost = fwd_cost + cost
                     if total_cost < best_cost:
                         best_cost = total_cost
-                        best_path = [int(n) for n in (forward_path[:-1] + path[::-1])]
-                if current in backward_visited and backward_visited[current][0] <= cost:
-                    continue
-                backward_visited[current] = (cost, path)
+                        best_path = [int(n) for n in (fwd_path[:-1] + path[::-1])]
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
@@ -253,14 +255,13 @@ class PathFinder:
                     h = self._heuristic(neighbor, start_str)
                     counter += 1
                     heappush(backward_pq, (new_cost + h, counter, neighbor, path + [neighbor], new_cost))
-            
+
             if best_path and forward_pq and backward_pq:
                 if forward_pq[0][0] + backward_pq[0][0] >= best_cost:
                     break
-        
+
         if best_path:
-            total_time = self._calculate_path_time(best_path, hour)
-            return best_path, total_time, nodes_explored
+            return best_path, round(best_cost, 2), nodes_explored
         return None, float('inf'), nodes_explored
 
     # ============================================================
