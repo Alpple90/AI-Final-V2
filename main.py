@@ -12,7 +12,7 @@ from gui import TBRGSGUI
 
 
 # train all three models on the SCATS data and save them to disk
-def _train_models(predictor):
+def trainModels(predictor):
     print("--- Loading traffic data for training ---")
     data = predictor.loadData()
 
@@ -48,7 +48,7 @@ def main():
     predictor = RealTrafficPredictor()
     if not predictor.loadModels():
         print("--- No saved models found, training new ones ---")
-        _train_models(predictor)
+        trainModels(predictor)
 
     print("--- Initializing pathfinder ---")
     pathfinder = PathFinder(graph, predictor, coords)
