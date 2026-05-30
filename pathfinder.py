@@ -277,18 +277,14 @@ class PathFinder:
         goalStr = str(goal)
 
         if startStr not in self.graph or goalStr not in self.graph:
-            print(f"[Yen's] ({self.currentAlgorithm}) {start} or {goal} not in graph, skipping")
             return []
-
-        print(f"[Yen's] ({self.currentAlgorithm}) searching {start} -> {goal}, up to {k} paths, hour={hour}")
 
         firstPath, firstCost, nodesExp = self.findPath(start, goal, hour)
         if not firstPath:
-            print(f"[Yen's] ({self.currentAlgorithm}) no initial path found")
             return []
 
         allPaths.append((firstPath, firstCost))
-        print(f"[Yen's] ({self.currentAlgorithm}) path 1: {' -> '.join(str(n) for n in firstPath)} | {firstCost:.2f} min | {len(firstPath)} nodes | {nodesExp} expanded")
+        print(f"  Path 1: {firstCost:.2f} min")
 
         potentialPaths = []  # min-heap of (cost, path)
 
@@ -328,12 +324,11 @@ class PathFinder:
                         candidatesAdded += 1
 
             if not potentialPaths:
-                print(f"[Yen's] ({self.currentAlgorithm}) no more candidates after path {kIdx}, stopping at {kIdx} path(s)")
                 break
 
             bestCost, bestPath = heappop(potentialPaths)
             allPaths.append((bestPath, bestCost))
-            print(f"[Yen's] ({self.currentAlgorithm}) path {kIdx+1}: {' -> '.join(str(n) for n in bestPath)} | {bestCost:.2f} min | {len(bestPath)} nodes | {candidatesAdded} candidate(s) generated")
+            print(f"  Path {kIdx+1}: {bestCost:.2f} min")
 
         allPaths.sort(key=lambda x: x[1])
 
@@ -347,7 +342,6 @@ class PathFinder:
             if len(result) >= k:
                 break
 
-        print(f"Total distinct routes found: {len(result)}")
         return result
 
     # run every algorithm and pool their routes, then deduplicate and return the best ones
@@ -357,7 +351,9 @@ class PathFinder:
         seen = {}   # path_tuple -> index in results
         results = []
 
+        print(f"---Finding routes {start} -> {goal}---")
         for algoName in self.algorithms:
+            print(f"\n--- {algoName.upper()} ---")
             self.setAlgorithm(algoName)
             kPaths = self.findTopKPaths(start, goal, k=maxPaths, hour=hour)
 
@@ -373,4 +369,5 @@ class PathFinder:
                     results.append((path, cost, [algoName]))
 
         results.sort(key=lambda x: x[1])
+        print(f"\n---{len(results[:maxPaths])} unique route(s) found---")
         return results[:maxPaths]
