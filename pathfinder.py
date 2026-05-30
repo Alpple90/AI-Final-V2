@@ -100,29 +100,24 @@ class PathFinder:
         start_str, goal_str = str(start), str(goal)
         if start_str not in self.graph or goal_str not in self.graph:
             return None, float('inf'), 0
-        
+
         stack = [(start_str, [start_str], 0)]
         visited = set()
         nodes_explored = 0
-        best_path, best_cost = None, float('inf')
-        
+
         while stack:
             current, path, depth = stack.pop()
             nodes_explored += 1
-            if depth > max_depth:
-                continue
             if current == goal_str:
                 total_time = self._calculate_path_time([int(n) for n in path], hour)
-                if total_time < best_cost:
-                    best_cost, best_path = total_time, [int(n) for n in path]
-                continue
-            if current in visited:
+                return [int(n) for n in path], total_time, nodes_explored
+            if current in visited or depth > max_depth:
                 continue
             visited.add(current)
             for neighbor, _ in self.graph.get(current, []):
                 if neighbor not in path:
                     stack.append((neighbor, path + [neighbor], depth + 1))
-        return best_path, best_cost, nodes_explored
+        return None, float('inf'), nodes_explored
 
     def _greedy(self, start, goal, hour=12):
         start_str, goal_str = str(start), str(goal)
