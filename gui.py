@@ -141,8 +141,9 @@ class TBRGSGUI:
                                        bg='#f0f0f0', padx=10, pady=10)
         results_frame.pack(fill='both', expand=True)
         
-        self.results_text = scrolledtext.ScrolledText(results_frame, height=14, 
-                                                       width=55, font=('Courier', 9))
+        self.results_text = scrolledtext.ScrolledText(results_frame, height=14,
+                                                       width=55, font=('Courier', 9),
+                                                       wrap=tk.NONE)
         self.results_text.pack(fill='both', expand=True)
     
     def _init_map(self):
