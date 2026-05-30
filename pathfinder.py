@@ -334,18 +334,22 @@ class PathFinder:
         return result
 
     def findUniquePaths(self, start, goal, hour=12, maxPaths=5):
-        # run every algorithm once, deduplicate, sort by time
-        seen = {}  # path_tuple -> index in results
+        # each algorithm finds up to maxPaths routes via Yen's spur method,
+        # then pool everything, deduplicate and return the top maxPaths
+        seen = {}   # path_tuple -> index in results
         results = []
 
-        for algoName, algoFunc in self.algorithms.items():
-            path, cost, _ = algoFunc(start, goal, hour)
-            if path:
+        for algoName in self.algorithms:
+            self.setAlgorithm(algoName)
+            kPaths = self.findTopKPaths(start, goal, k=maxPaths, hour=hour)
+
+            for path, cost in kPaths:
                 key = tuple(path)
                 if key in seen:
                     idx = seen[key]
                     existingPath, existingCost, existingAlgos = results[idx]
-                    results[idx] = (existingPath, existingCost, existingAlgos + [algoName])
+                    if algoName not in existingAlgos:
+                        results[idx] = (existingPath, existingCost, existingAlgos + [algoName])
                 else:
                     seen[key] = len(results)
                     results.append((path, cost, [algoName]))
