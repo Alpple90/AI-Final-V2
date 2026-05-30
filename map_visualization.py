@@ -163,13 +163,13 @@ class SCATSMapViewer:
                 self.current_route_items.append(new_marker)
                 self.markers[node_str] = new_marker
 
-    def draw_all_routes(self, paths):
-        """Draw all routes, highlighting the best one."""
+    def draw_all_routes(self, paths, highlight_idx=0):
+        """Draw all routes, highlighting the one at highlight_idx."""
         self.clear_route()
         route_colors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         for i, (path, _, _) in enumerate(paths):
             color = route_colors[i % len(route_colors)]
-            self.draw_route(path, color=color, is_best=(i == 0))
+            self.draw_route(path, color=color, is_best=(i == highlight_idx))
     
     def clear_route(self):
         """Clear the currently displayed route"""

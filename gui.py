@@ -26,6 +26,8 @@ class TBRGSGUI:
         self.map_widget = None
         self.results_text = None
         self.status_var = None
+        self.current_paths = []
+        self.selected_route_idx = 0
         
         # Setup window
         self._setup_window()
@@ -66,6 +68,7 @@ class TBRGSGUI:
         self._build_input_frame(left_panel)
         self._build_model_frame(left_panel)
         self._build_button_frame(left_panel)
+        self._build_route_selector(left_panel)
         self._build_results_frame(left_panel)
     
     def _build_input_frame(self, parent):
@@ -140,7 +143,17 @@ class TBRGSGUI:
                                         font=('Arial', 10),
                                         padx=15, pady=5)
         self.compare_button.pack(side='left', padx=5)
-    
+
+    def _build_route_selector(self, parent):
+        self.route_selector_frame = tk.LabelFrame(parent, text="Display Route",
+                                                   font=('Arial', 11, 'bold'),
+                                                   bg='#f0f0f0', padx=10, pady=5)
+        self.route_selector_frame.pack(fill='x', pady=(0, 10))
+        self.route_buttons_row = tk.Frame(self.route_selector_frame, bg='#f0f0f0')
+        self.route_buttons_row.pack(fill='x')
+        tk.Label(self.route_selector_frame, text="Find routes to see options.",
+                 font=('Arial', 9), bg='#f0f0f0', fg='#888888').pack()
+
     def _build_results_frame(self, parent):
         results_frame = tk.LabelFrame(parent, text="Route Results (Top-K Routes)", 
                                        font=('Arial', 11, 'bold'), 
@@ -183,6 +196,31 @@ class TBRGSGUI:
             self.map_viewer.locate_site(site)
             self.status_var.set(f"Located SCATS {site}")
     
+    def _populate_route_buttons(self):
+        for w in self.route_buttons_row.winfo_children():
+            w.destroy()
+        for w in self.route_selector_frame.winfo_children():
+            if isinstance(w, tk.Label):
+                w.destroy()
+
+        route_colors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
+        for i, (_, total_time, _) in enumerate(self.current_paths):
+            color = route_colors[i % len(route_colors)]
+            btn = tk.Button(self.route_buttons_row,
+                            text=f"Route {i+1}",
+                            command=lambda idx=i: self._select_route(idx),
+                            bg=color, fg='white',
+                            font=('Arial', 9, 'bold'),
+                            padx=8, pady=3,
+                            relief='sunken' if i == 0 else 'raised')
+            btn.pack(side='left', padx=3, pady=3)
+
+    def _select_route(self, idx):
+        self.selected_route_idx = idx
+        self.map_viewer.draw_all_routes(self.current_paths, highlight_idx=idx)
+        for i, btn in enumerate(self.route_buttons_row.winfo_children()):
+            btn.config(relief='sunken' if i == idx else 'raised')
+
     def clear_route(self):
         """Clear route from map and results"""
         self.map_viewer.clear_route()
@@ -238,12 +276,14 @@ class TBRGSGUI:
 
         paths = self.pathfinder.find_unique_paths_all_algorithms(origin, dest, hour, max_paths=5)
 
+        self.current_paths = paths
         if paths:
             self.map_viewer.draw_all_routes(paths)
             best_algos = " & ".join(a.upper() for a in paths[0][2])
             self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
         else:
             self.status_var.set("No routes found. Try different origin/destination.")
+        self._populate_route_buttons()
 
         self._display_results(origin, dest, hour, model_name, paths)
     
