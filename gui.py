@@ -235,7 +235,8 @@ class TBRGSGUI:
 
         if paths:
             self.map_viewer.draw_route(paths[0][0])
-            self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({paths[0][2].upper()})")
+            best_algos = " & ".join(a.upper() for a in paths[0][2])
+            self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
         else:
             self.status_var.set("No routes found. Try different origin/destination.")
 
@@ -264,10 +265,11 @@ class TBRGSGUI:
 
         self.results_text.insert(tk.END, f"✓ Found {len(paths)} unique route(s):\n\n")
 
-        for i, (path, total_time, algo) in enumerate(paths, 1):
+        for i, (path, total_time, algos) in enumerate(paths, 1):
+            algo_names = " & ".join(algo_display.get(a, a) for a in algos)
             self.results_text.insert(tk.END, f"{'─' * 60}\n")
             self.results_text.insert(tk.END,
-                f"ROUTE {i} │ {total_time:.1f} min ({total_time/60:.1f} hrs) │ {algo_display.get(algo, algo)}\n")
+                f"ROUTE {i} │ {total_time:.1f} min ({total_time/60:.1f} hrs) │ {algo_names}\n")
             self.results_text.insert(tk.END, f"{'─' * 60}\n")
             
             # Show path with arrows
@@ -292,7 +294,7 @@ class TBRGSGUI:
             else:
                 self.results_text.insert(tk.END, f"  {path_str}\n")
             
-            self.results_text.insert(tk.END, f"\n  Total travel time: {total_time:.1f} minutes  [Found by {algo_display.get(algo, algo)}]\n")
+            self.results_text.insert(tk.END, f"\n  Total travel time: {total_time:.1f} minutes  [Found by {algo_names}]\n")
         
         self.results_text.insert(tk.END, f"\n{'=' * 65}\n")
     
