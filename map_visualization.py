@@ -135,33 +135,25 @@ class SCATSMapViewer:
                 )
                 self.current_route_items.append(line)
 
-        # Only mark origin/destination on the best route to avoid clutter
+        # Mark origin/destination on the highlighted route
         if is_best:
-            for i, node in enumerate(path):
-                node_str = str(node)
+            origin_str = str(path[0])
+            dest_str = str(path[-1])
+            for node_str, marker_colour, text in [
+                (origin_str, '#2e7d32', f"🚗 {origin_str}"),
+                (dest_str,   '#c62828', f"🏁 {dest_str}"),
+            ]:
                 if node_str not in self.coords:
                     continue
-                if node_str in self.markers:
-                    try:
-                        self.markers[node_str].delete()
-                    except:
-                        pass
-                if i == 0:
-                    marker_colour, text = '#2e7d32', f"🚗 {node_str}"
-                elif i == len(path) - 1:
-                    marker_colour, text = '#c62828', f"🏁 {node_str}"
-                else:
-                    continue
                 lat, lng = self.coords[node_str]
-                new_marker = self.map_widget.set_marker(
+                m = self.map_widget.set_marker(
                     lat, lng,
                     text=text,
                     marker_color_circle=marker_colour,
                     marker_color_outside='#ffffff',
                     font=('Arial', 11, 'bold')
                 )
-                self.current_route_items.append(new_marker)
-                self.markers[node_str] = new_marker
+                self.current_route_items.append(m)
 
     def draw_all_routes(self, paths, highlight_idx=0):
         """Draw all routes, highlighting the one at highlight_idx."""
