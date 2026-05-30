@@ -1,6 +1,5 @@
 # map_visualization.py - tkintermapview wrapper for the SCATS network
 
-import math
 from config import MAP_TILE_SERVER, MAP_ZOOM_LEVEL, MAP_LOCATE_ZOOM
 
 from map import (
@@ -169,10 +168,6 @@ class SCATSMapViewer:
     # return the raw node connection dict from the map module
     def getNodeConnections(self):
         return NODE_CONNECTIONS
-
-    # return the colour mapping for each node
-    def getNodeColours(self):
-        return NODE_COLOURS
 
     # return the lat/lng coordinate dict for all loaded sites
     def getCoords(self):

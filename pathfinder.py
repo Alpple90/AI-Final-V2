@@ -66,8 +66,7 @@ class PathFinder:
         dlon = lon2_r - lon1_r
         a = math.sin(dlat/2)**2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon/2)**2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        distKm = R * c
-        return (distKm / 60) * 60
+        return R * c
 
     # run BFS from start to goal, return path + cost + nodes explored
     def bfs(self, start, goal, hour=12):
