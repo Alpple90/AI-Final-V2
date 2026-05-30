@@ -239,7 +239,7 @@ class TBRGSGUI:
         paths = self.pathfinder.find_unique_paths_all_algorithms(origin, dest, hour, max_paths=5)
 
         if paths:
-            self.map_viewer.draw_route(paths[0][0])
+            self.map_viewer.draw_all_routes(paths)
             best_algos = " & ".join(a.upper() for a in paths[0][2])
             self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
         else:
