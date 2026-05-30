@@ -1,4 +1,4 @@
-# main.py
+# main.py - entry point for TBRGS
 import tkinter as tk
 import warnings
 warnings.filterwarnings('ignore')
@@ -12,53 +12,48 @@ from gui import TBRGSGUI
 
 
 def _train_models(predictor):
-    print("\n    Loading traffic data for training...")
+    print("--- Loading traffic data for training ---")
     data = predictor.load_data_from_excel()
 
-    print("    Training LSTM model...")
+    print("--- Training LSTM model ---")
     predictor.train_lstm(data['X_train_lstm'], data['y_train'],
                          data['X_test_lstm'], data['y_test'], epochs=30, verbose=True)
 
-    print("\n    Training GRU model...")
+    print("--- Training GRU model ---")
     predictor.train_gru(data['X_train_lstm'], data['y_train'],
                         data['X_test_lstm'], data['y_test'], epochs=30, verbose=True)
 
-    print("\n    Training XGBoost model...")
+    print("--- Training XGBoost model ---")
     predictor.train_xgboost(data['X_train_xgb'], data['y_train'],
                             data['X_test_xgb'], data['y_test'], verbose=True)
 
-    print("\n    Saving models...")
+    print("--- Saving models ---")
     predictor.save_models()
-    print("    Training complete!")
+    print("--- Training complete ---")
 
 
 def main():
-    print("\n" + "=" * 60)
-    print("TBRGS - Traffic-Based Route Guidance System")
-    print("=" * 60 + "\n")
+    print("--- Loading map data ---")
+    mapViewer = SCATSMapViewer()
+    coords = mapViewer.load_coordinates()
 
-    print("Step 1: Loading map data...")
-    map_viewer = SCATSMapViewer()
-    coords = map_viewer.load_coordinates()
-
-    print("\nStep 2: Building road network graph...")
-    graph = build_graph(map_viewer.get_node_connections(), coords)
+    print("--- Building road network graph ---")
+    graph = build_graph(mapViewer.get_node_connections(), coords)
     info = get_graph_info(graph)
     print(f"    Nodes: {info['total_nodes']},  Edges: {info['total_edges']},  Isolated: {info['isolated_nodes']}")
 
-    print("\nStep 3: Initializing traffic prediction models...")
+    print("--- Initializing traffic prediction models ---")
     predictor = RealTrafficPredictor()
-    print("    Loading pre-trained models...")
     if not predictor.load_models():
-        print("    Could not load models. Training new models...")
+        print("--- No saved models found, training new ones ---")
         _train_models(predictor)
 
-    print("\nStep 4: Initializing pathfinder...")
+    print("--- Initializing pathfinder ---")
     pathfinder = PathFinder(graph, predictor, coords)
 
-    print("\nStep 5: Launching GUI...\n")
+    print("--- Launching GUI ---")
     root = tk.Tk()
-    TBRGSGUI(root, map_viewer, pathfinder)
+    TBRGSGUI(root, mapViewer, pathfinder)
     root.mainloop()
 
 

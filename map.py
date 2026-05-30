@@ -64,14 +64,16 @@ NODE_COLOURS = {
  
  
 def load_sites():
+    # read excel, split lat/long column, strip leading zeros from SCATS numbers
     df = pd.read_excel(TRUE_FILE)
     df[['LAT', 'LNG']] = df['Lat Long'].str.split(expand=True).astype(float)
     df['SCATS Number'] = df['SCATS Number'].astype(str).str.lstrip('0').str.strip()
     df.loc[df['SCATS Number'] == '', 'SCATS Number'] = '0'
     return df[['SCATS Number', 'LAT', 'LNG']]
- 
- 
+
+
 def draw_edges(map_widget, coords):
+    # draw each edge once by tracking sorted node pairs
     drawn = set()
     paths = []
     for a, neighbours in NODE_CONNECTIONS.items():
@@ -89,16 +91,16 @@ def draw_edges(map_widget, coords):
             p = map_widget.set_path([(la, lo), (lb, lo2)], color='#888888', width=2)
             paths.append(p)
     return paths
- 
- 
+
+
 if __name__ == '__main__':
     sites = load_sites()
     coords = {r['SCATS Number']: (r['LAT'], r['LNG']) for _, r in sites.iterrows()}
- 
+
     root = tk.Tk()
     root.title('SCATS Node Graph')
     root.geometry('1200x800')
- 
+
     map_widget = tkintermapview.TkinterMapView(root, corner_radius=0)
     map_widget.pack(fill='both', expand=True)
     map_widget.set_tile_server(
@@ -108,9 +110,9 @@ if __name__ == '__main__':
     lngs = [c[1] for c in coords.values()]
     map_widget.set_position(sum(lats) / len(lats), sum(lngs) / len(lngs))
     map_widget.set_zoom(13)
- 
+
     draw_edges(map_widget, coords)
- 
+
     for _, row in sites.iterrows():
         sid = row['SCATS Number']
         map_widget.set_marker(
@@ -119,5 +121,5 @@ if __name__ == '__main__':
             marker_color_circle=NODE_COLOURS.get(sid, '#1a1a2e'),
             marker_color_outside='#ffffff',
         )
- 
+
     root.mainloop()

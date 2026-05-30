@@ -1,4 +1,4 @@
-# graph_builder.py
+# graph_builder.py - build adjacency list from SCATS connections + coords
 import math
 
 
@@ -13,6 +13,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 
 def build_graph(connections, coords):
+    # start with every node having an empty neighbour list
     graph = {node: [] for node in set(connections) | {n for nbrs in connections.values() for n in nbrs}}
 
     for node, neighbors in connections.items():
@@ -22,6 +23,7 @@ def build_graph(connections, coords):
             if neighbor not in coords:
                 continue
             distance = haversine_distance(*coords[node], *coords[neighbor])
+            # skip edges that are implausibly short or long
             if 0.1 <= distance <= 10.0:
                 graph[node].append((neighbor, round(distance, 3)))
 
