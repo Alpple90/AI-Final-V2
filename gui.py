@@ -142,8 +142,7 @@ class TBRGSGUI:
         results_frame.pack(fill='both', expand=True)
         
         self.results_text = scrolledtext.ScrolledText(results_frame, height=14,
-                                                       width=55, font=('Courier', 9),
-                                                       wrap=tk.NONE)
+                                                       width=55, font=('Courier', 9))
         self.results_text.pack(fill='both', expand=True)
     
     def _init_map(self):
@@ -244,18 +243,18 @@ class TBRGSGUI:
     
     def _display_results(self, origin, dest, hour, model_name, paths):
         """Display formatted results including all unique routes."""
-        self.results_text.insert(tk.END, "=" * 65 + "\n")
+        SEP = "=" * 40
+        self.results_text.insert(tk.END, SEP + "\n")
         self.results_text.insert(tk.END, "TBRGS ROUTE RESULTS\n")
-        self.results_text.insert(tk.END, "=" * 65 + "\n\n")
+        self.results_text.insert(tk.END, SEP + "\n")
+        self.results_text.insert(tk.END, f"Origin:    SCATS {origin}\n")
+        self.results_text.insert(tk.END, f"Dest:      SCATS {dest}\n")
+        self.results_text.insert(tk.END, f"Departure: {self.time_var.get()} (Hour {hour}:00)\n")
+        self.results_text.insert(tk.END, f"ML Model:  {model_name.upper()}\n")
+        self.results_text.insert(tk.END, SEP + "\n\n")
 
-        self.results_text.insert(tk.END, f"Origin:      SCATS {origin}\n")
-        self.results_text.insert(tk.END, f"Destination: SCATS {dest}\n")
-        self.results_text.insert(tk.END, f"Departure:   {self.time_var.get()} (Hour {hour}:00)\n")
-        self.results_text.insert(tk.END, f"ML Model:    {model_name.upper()}\n")
-        self.results_text.insert(tk.END, "=" * 65 + "\n\n")
-        
         if not paths:
-            self.results_text.insert(tk.END, "❌ No routes found!\n\n")
+            self.results_text.insert(tk.END, "No routes found!\n\n")
             return
 
         algo_display = {
@@ -263,40 +262,32 @@ class TBRGSGUI:
             'dijkstra': "Dijkstra's", 'greedy': 'Greedy', 'bfs': 'BFS', 'dfs': 'DFS'
         }
 
-        self.results_text.insert(tk.END, f"✓ Found {len(paths)} unique route(s):\n\n")
+        self.results_text.insert(tk.END, f"Found {len(paths)} unique route(s):\n\n")
 
         for i, (path, total_time, algos) in enumerate(paths, 1):
             algo_names = " & ".join(algo_display.get(a, a) for a in algos)
-            self.results_text.insert(tk.END, f"{'─' * 60}\n")
-            self.results_text.insert(tk.END,
-                f"ROUTE {i} │ {total_time:.1f} min ({total_time/60:.1f} hrs) │ {algo_names}\n")
-            self.results_text.insert(tk.END, f"{'─' * 60}\n")
-            
-            # Show path with arrows
-            path_str = " → ".join(str(n) for n in path)
-            if len(path_str) > 70:
-                nodes = [str(n) for n in path]
-                lines = []
-                current_line = []
-                curr_len = 0
-                for node in nodes:
-                    if curr_len + len(node) + 3 > 70:
-                        lines.append(" → ".join(current_line))
-                        current_line = [node]
-                        curr_len = len(node)
-                    else:
-                        current_line.append(node)
-                        curr_len += len(node) + 3
-                if current_line:
-                    lines.append(" → ".join(current_line))
-                for line in lines:
-                    self.results_text.insert(tk.END, f"  {line}\n")
-            else:
-                self.results_text.insert(tk.END, f"  {path_str}\n")
-            
-            self.results_text.insert(tk.END, f"\n  Total travel time: {total_time:.1f} minutes  [Found by {algo_names}]\n")
-        
-        self.results_text.insert(tk.END, f"\n{'=' * 65}\n")
+            self.results_text.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
+            self.results_text.insert(tk.END, f"By: {algo_names}\n")
+            self.results_text.insert(tk.END, "─" * 40 + "\n")
+
+            # Wrap path nodes at 40 chars
+            nodes = [str(n) for n in path]
+            current_line = []
+            curr_len = 0
+            for node in nodes:
+                if curr_len + len(node) + 4 > 40:
+                    self.results_text.insert(tk.END, "  " + " → ".join(current_line) + "\n")
+                    current_line = [node]
+                    curr_len = len(node)
+                else:
+                    current_line.append(node)
+                    curr_len += len(node) + 4
+            if current_line:
+                self.results_text.insert(tk.END, "  " + " → ".join(current_line) + "\n")
+
+            self.results_text.insert(tk.END, "\n")
+
+        self.results_text.insert(tk.END, SEP + "\n")
     
     def compare_algorithms(self):
         """Compare all algorithms on the current origin/destination"""
@@ -311,39 +302,38 @@ class TBRGSGUI:
         
         self.results_text.delete(1.0, tk.END)
         
-        self.results_text.insert(tk.END, "=" * 65 + "\n")
+        SEP = "=" * 40
+        self.results_text.insert(tk.END, SEP + "\n")
         self.results_text.insert(tk.END, "ALGORITHM COMPARISON\n")
-        self.results_text.insert(tk.END, "=" * 65 + "\n\n")
-        self.results_text.insert(tk.END, f"Origin: {origin}  →  Destination: {dest}\n")
-        self.results_text.insert(tk.END, f"Time: {self.time_var.get()} (Hour {hour}:00)\n")
-        self.results_text.insert(tk.END, f"ML Model: {model_name.upper()}\n\n")
-        
-        self.results_text.insert(tk.END, f"{'Algorithm':<18} {'Time(min)':<12} {'Nodes':<10} {'Success'}\n")
-        self.results_text.insert(tk.END, "-" * 55 + "\n")
-        
+        self.results_text.insert(tk.END, SEP + "\n")
+        self.results_text.insert(tk.END, f"Origin: {origin}  Dest: {dest}\n")
+        self.results_text.insert(tk.END, f"Time: {self.time_var.get()}  Model: {model_name.upper()}\n\n")
+
+        self.results_text.insert(tk.END, f"{'Algorithm':<16} {'min':<8} {'Nodes':<7} \n")
+        self.results_text.insert(tk.END, "-" * 40 + "\n")
+
         algorithms = ['astar', 'bidirectional', 'dijkstra', 'greedy', 'bfs', 'dfs']
-        algo_names = ['A*', 'Bidirectional A*', 'Dijkstra', 'Greedy', 'BFS', 'DFS']
-        
+        algo_names = ['A*', 'Bidir A*', 'Dijkstra', 'Greedy', 'BFS', 'DFS']
+
         best_time = float('inf')
         best_algo = None
-        
+
         for algo, name in zip(algorithms, algo_names):
             self.pathfinder.set_algorithm(algo)
             self.pathfinder.set_model(model_name)
             path, cost, nodes = self.pathfinder.find_path(origin, dest, hour)
-            
+
             if path:
-                success = "✓"
-                self.results_text.insert(tk.END, f"{name:<18} {cost:<12.1f} {nodes:<10} {success}\n")
+                self.results_text.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} ✓\n")
                 if cost < best_time:
                     best_time = cost
                     best_algo = name
             else:
-                self.results_text.insert(tk.END, f"{name:<18} {'N/A':<12} {nodes:<10} {'✗'}\n")
-        
-        self.results_text.insert(tk.END, "-" * 55 + "\n")
+                self.results_text.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} ✗\n")
+
+        self.results_text.insert(tk.END, "-" * 40 + "\n")
         if best_algo:
-            self.results_text.insert(tk.END, f"\n🏆 Best algorithm: {best_algo} ({best_time:.1f} minutes)\n")
-        
-        self.results_text.insert(tk.END, f"\n{'=' * 65}\n")
+            self.results_text.insert(tk.END, f"\n🏆 {best_algo} ({best_time:.1f} min)\n")
+
+        self.results_text.insert(tk.END, "\n" + SEP + "\n")
         self.status_var.set(f"Comparison complete. Best: {best_algo} ({best_time:.1f} min)")
