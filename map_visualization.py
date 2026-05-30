@@ -34,6 +34,8 @@ class SCATSMapViewer:
         self.coords = {}          # SCATS number -> (lat, lon)
         self.markers = {}         # SCATS number -> marker object
         self.current_route_items = []  # Temporary route elements
+        self.network_paths = []   # Network edge path objects
+        self.network_visible = True
         self.is_initialized = False
         
     def load_coordinates(self):
@@ -74,7 +76,8 @@ class SCATSMapViewer:
             return
         
         # Draw roads using YOUR draw_edges function
-        draw_edges(self.map_widget, self.coords)
+        self.network_paths = draw_edges(self.map_widget, self.coords)
+        self.network_visible = True
         
         # Draw markers using YOUR colors
         for sid, (lat, lng) in self.coords.items():
@@ -90,6 +93,21 @@ class SCATSMapViewer:
         
         self.is_initialized = True
     
+    def toggle_network(self):
+        """Show or hide the network edges."""
+        if self.network_visible:
+            for p in self.network_paths:
+                try:
+                    p.delete()
+                except:
+                    pass
+            self.network_paths = []
+            self.network_visible = False
+        else:
+            self.network_paths = draw_edges(self.map_widget, self.coords)
+            self.network_visible = True
+        return self.network_visible
+
     def locate_site(self, site_str):
         """Center map on a specific SCATS site"""
         if not self.map_widget or site_str not in self.coords:

@@ -82,36 +82,23 @@ def load_sites():
  
  
 def draw_edges(map_widget, coords):
-    OFFSET = 0.00007
- 
-    def perp_offset(la, lo, lb, lo2, side):
-        dlat, dlng = lb - la, lo2 - lo
-        length = math.hypot(dlat, dlng) or 1e-9
-        px = -dlng / length * OFFSET * side
-        py =  dlat / length * OFFSET * side
-        return (la + px, lo + py), (lb + px, lo2 + py)
- 
-    directed = {
-        (a, b): NODE_COLOURS.get(a, '#999')
-        for a, neighbours in NODE_CONNECTIONS.items() if a in coords
-        for b in neighbours if b in coords
-    }
- 
     drawn = set()
-    for (a, b), colour in directed.items():
-        key = tuple(sorted([a, b]))
-        if key in drawn:
+    paths = []
+    for a, neighbours in NODE_CONNECTIONS.items():
+        if a not in coords:
             continue
-        drawn.add(key)
-        la, lo  = coords[a]
-        lb, lo2 = coords[b]
-        if (b, a) in directed:
-            p1, p2 = perp_offset(la, lo, lb, lo2, +1)
-            map_widget.set_path([p1, p2], color=colour, width=3)
-            p1, p2 = perp_offset(la, lo, lb, lo2, -1)
-            map_widget.set_path([p1, p2], color=NODE_COLOURS.get(b, '#999'), width=3)
-        else:
-            map_widget.set_path([(la, lo), (lb, lo2)], color=colour, width=3)
+        for b in neighbours:
+            if b not in coords:
+                continue
+            key = tuple(sorted([a, b]))
+            if key in drawn:
+                continue
+            drawn.add(key)
+            la, lo = coords[a]
+            lb, lo2 = coords[b]
+            p = map_widget.set_path([(la, lo), (lb, lo2)], color='#888888', width=2)
+            paths.append(p)
+    return paths
  
  
 if __name__ == '__main__':

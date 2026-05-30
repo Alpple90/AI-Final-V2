@@ -128,12 +128,19 @@ class TBRGSGUI:
                                       padx=15, pady=5)
         self.clear_button.pack(side='left', padx=5)
         
-        self.compare_button = tk.Button(button_frame, text="COMPARE ALGORITHMS", 
+        self.compare_button = tk.Button(button_frame, text="COMPARE ALGORITHMS",
                                         command=self.compare_algorithms,
-                                        bg='#9c27b0', fg='white', 
-                                        font=('Arial', 10), 
+                                        bg='#9c27b0', fg='white',
+                                        font=('Arial', 10),
                                         padx=15, pady=5)
         self.compare_button.pack(side='left', padx=5)
+
+        self.network_button = tk.Button(button_frame, text="HIDE NETWORK",
+                                        command=self._toggle_network,
+                                        bg='#37474f', fg='white',
+                                        font=('Arial', 10),
+                                        padx=15, pady=5)
+        self.network_button.pack(side='left', padx=5)
     
     def _build_results_frame(self, parent):
         results_frame = tk.LabelFrame(parent, text="Route Results (Top-K Routes)", 
@@ -177,6 +184,10 @@ class TBRGSGUI:
             self.map_viewer.locate_site(site)
             self.status_var.set(f"Located SCATS {site}")
     
+    def _toggle_network(self):
+        visible = self.map_viewer.toggle_network()
+        self.network_button.config(text="HIDE NETWORK" if visible else "SHOW NETWORK")
+
     def clear_route(self):
         """Clear route from map and results"""
         self.map_viewer.clear_route()
