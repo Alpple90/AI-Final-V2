@@ -27,6 +27,7 @@ class SCATSMapViewer:
         self.networkPaths = []
         self.isInitialized = False
 
+    # read lat/lng for every SCATS site from the data source and store them
     def loadCoords(self):
         sitesDF = load_sites()
         self.coords = {
@@ -36,9 +37,11 @@ class SCATSMapViewer:
         print(f"Loaded {len(self.coords)} SCATS sites with coordinates")
         return self.coords
 
+    # return a sorted list of numeric SCATS site IDs
     def getSites(self):
         return sorted([s for s in self.coords.keys() if s.isdigit()], key=int)
 
+    # spin up the map widget inside the given frame and centre it on Boroondara
     def createMap(self, parentFrame):
         if not MAP_AVAILABLE:
             return None
@@ -56,6 +59,7 @@ class SCATSMapViewer:
 
         return self.mapWidget
 
+    # draw all road edges and place a marker for every SCATS site
     def drawNetwork(self):
         if not self.mapWidget or not self.coords:
             return
@@ -76,6 +80,7 @@ class SCATSMapViewer:
 
         self.isInitialized = True
 
+    # pan and zoom the map to a specific SCATS site
     def locateSite(self, siteStr):
         if not self.mapWidget or siteStr not in self.coords:
             return False
@@ -84,6 +89,7 @@ class SCATSMapViewer:
         self.mapWidget.set_zoom(MAP_LOCATE_ZOOM)
         return True
 
+    # draw the route as coloured lines and optionally highlight start/end markers
     def drawRoute(self, path, color='#ff6f00', isBest=False):
         if not self.mapWidget or len(path) < 2:
             return
@@ -123,6 +129,7 @@ class SCATSMapViewer:
                 self.markers[nodeStr] = m
                 self.currentRouteItems.append((nodeStr, m))
 
+    # remove all drawn route lines and restore any markers we changed
     def clearRoute(self):
         highlightedNodes = set()
         for item in self.currentRouteItems:
@@ -155,14 +162,18 @@ class SCATSMapViewer:
                     font=('Arial', 10, 'bold')
                 )
 
+    # check whether the tkintermapview package is installed
     def mapAvailable(self):
         return MAP_AVAILABLE
 
+    # return the raw node connection dict from the map module
     def getNodeConnections(self):
         return NODE_CONNECTIONS
 
+    # return the colour mapping for each node
     def getNodeColours(self):
         return NODE_COLOURS
 
+    # return the lat/lng coordinate dict for all loaded sites
     def getCoords(self):
         return self.coords

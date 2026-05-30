@@ -2,6 +2,7 @@
 import math
 
 
+# calculate the great-circle distance in km between two lat/lng points
 def haversineDistance(lat1, lon1, lat2, lon2):
     R = 6371
     lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
@@ -30,6 +31,7 @@ def buildGraph(connections, coords):
     return graph
 
 
+# return a quick summary of node count, edge count and isolated nodes
 def getGraphInfo(graph):
     return {
         'total_nodes': len(graph),

@@ -35,6 +35,7 @@ def flowToSpeed(flowPerHour):
     return min(speeds)
 
 
+# convert a road segment distance and 15-min flow count into a travel time in minutes
 def calcTravelTime(distanceKm, flowPer15min):
     speed = min(flowToSpeed(flowPer15min * 4), SPEED_LIMIT_KPH)
     if speed <= 0.1:

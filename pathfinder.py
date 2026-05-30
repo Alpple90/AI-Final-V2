@@ -23,9 +23,11 @@ class PathFinder:
             'bidirectional': self._bidirectionalAstar
         }
 
+    # swap out the ML model used for traffic prediction
     def setModel(self, modelName):
         self.currentModel = modelName
 
+    # switch to a different search algorithm, returns False if unknown
     def setAlgorithm(self, algoName):
         if algoName in self.algorithms:
             self.currentAlgorithm = algoName
@@ -37,6 +39,7 @@ class PathFinder:
         predictedFlow = self.traffic_predictor.predict(self.currentModel, None, hour)
         return calcTravelTime(distance, predictedFlow)
 
+    # sum up travel time across every edge in the path
     def _calcPathTime(self, path, hour):
         if len(path) < 2:
             return 0
@@ -66,6 +69,7 @@ class PathFinder:
         distKm = R * c
         return (distKm / 60) * 60
 
+    # run BFS from start to goal, return path + cost + nodes explored
     def _bfs(self, start, goal, hour=12):
         from collections import deque
         startStr, goalStr = str(start), str(goal)
@@ -88,6 +92,7 @@ class PathFinder:
                     queue.append((neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
+    # run DFS from start to goal with a depth cap to avoid runaway paths
     def _dfs(self, start, goal, hour=12, maxDepth=50):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
@@ -111,6 +116,7 @@ class PathFinder:
                     stack.append((neighbor, path + [neighbor], depth + 1))
         return None, float('inf'), nodesExplored
 
+    # greedy best-first search, picks the node that looks closest to the goal
     def _greedy(self, start, goal, hour=12):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
@@ -135,6 +141,7 @@ class PathFinder:
                     heappush(pq, (h, neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
+    # A* search combining actual cost with haversine heuristic
     def _astar(self, start, goal, hour=12):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
@@ -163,6 +170,7 @@ class PathFinder:
                 heappush(pq, (newCost + h, counter, neighbor, path + [neighbor], newCost))
         return None, float('inf'), nodesExplored
 
+    # dijkstra's shortest path expanding by lowest cost so far
     def _dijkstra(self, start, goal, hour=12):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
@@ -188,6 +196,7 @@ class PathFinder:
                 heappush(pq, (newCost, neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
+    # A* searching from both ends simultaneously and merging when they meet
     def _bidirectionalAstar(self, start, goal, hour=12):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
@@ -256,11 +265,12 @@ class PathFinder:
             return bestPath, round(bestCost, 2), nodesExplored
         return None, float('inf'), nodesExplored
 
+    # dispatch to whichever algorithm is currently selected
     def findPath(self, start, goal, hour=12):
         algoFunc = self.algorithms.get(self.currentAlgorithm, self._astar)
         return algoFunc(start, goal, hour)
 
-    # Yen's-style k-shortest paths
+    # find the k cheapest paths using Yen's spur approach
     def findTopKPaths(self, start, goal, k=DEFAULT_K_ROUTES, hour=12):
         allPaths = []
         startStr = str(start)
@@ -333,6 +343,7 @@ class PathFinder:
         print(f"Total distinct routes found: {len(result)}")
         return result
 
+    # run every algorithm and pool their routes, then deduplicate and return the best ones
     def findUniquePaths(self, start, goal, hour=12, maxPaths=5):
         # each algorithm finds up to maxPaths routes via Yen's spur method,
         # then pool everything, deduplicate and return the top maxPaths

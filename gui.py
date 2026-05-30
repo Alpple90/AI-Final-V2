@@ -30,11 +30,13 @@ class TBRGSGUI:
         else:
             self.showMapUnavail()
 
+    # set the window title, size and background colour
     def setupWindow(self):
         self.root.title("TBRGS - Traffic-Based Route Guidance System")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.root.configure(bg='#f0f0f0')
 
+    # lay out the left control panel and right map panel
     def buildGui(self):
         leftPanel = tk.Frame(self.root, bg='#f0f0f0', width=LEFT_PANEL_WIDTH)
         leftPanel.pack(side='left', fill='both', expand=False, padx=(10, 5), pady=10)
@@ -57,6 +59,7 @@ class TBRGSGUI:
         self.buildRouteSelector(leftPanel)
         self.buildResultsFrame(leftPanel)
 
+    # build the origin/destination/time input section
     def buildInputFrame(self, parent):
         inputFrame = tk.LabelFrame(parent, text="Trip Information",
                                     font=('Arial', 11, 'bold'),
@@ -84,6 +87,7 @@ class TBRGSGUI:
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
 
+    # add radio buttons for choosing LSTM, GRU or XGBoost
     def buildModelFrame(self, parent):
         modelFrame = tk.LabelFrame(parent, text="ML Model Selection",
                                     font=('Arial', 11, 'bold'),
@@ -96,6 +100,7 @@ class TBRGSGUI:
                           value=value, font=('Arial', 10), bg='#f0f0f0').grid(
                           row=0, column=i, padx=20, pady=5)
 
+    # add the find routes, clear map and compare algorithms buttons
     def buildBtnFrame(self, parent):
         btnFrame = tk.Frame(parent, bg='#f0f0f0')
         btnFrame.pack(fill='x', pady=(0, 10))
@@ -124,6 +129,7 @@ class TBRGSGUI:
                   font=('Arial', 10),
                   padx=15, pady=5).pack(side='left', padx=5)
 
+    # create the row of colour-coded route buttons (populated after search)
     def buildRouteSelector(self, parent):
         self.routeSelectorFrame = tk.LabelFrame(parent, text="Display Route",
                                                    font=('Arial', 11, 'bold'),
@@ -134,6 +140,7 @@ class TBRGSGUI:
         tk.Label(self.routeSelectorFrame, text="Find routes to see options.",
                  font=('Arial', 9), bg='#f0f0f0', fg='#888888').pack()
 
+    # add the scrollable text box where route results are printed
     def buildResultsFrame(self, parent):
         resultsFrame = tk.LabelFrame(parent, text="Route Results (Top-K Routes)",
                                       font=('Arial', 11, 'bold'),
@@ -144,18 +151,20 @@ class TBRGSGUI:
                                                        width=55, font=('Courier', 9))
         self.resultsText.pack(fill='both', expand=True)
 
+    # create the map widget and draw the SCATS network on it
     def initMap(self):
         self.mapWidget = self.map_viewer.createMap(self.rightPanel)
         self.map_viewer.drawNetwork()
         self.updateSiteLists()
 
+    # show an error message in place of the map when tkintermapview isn't installed
     def showMapUnavail(self):
         tk.Label(self.rightPanel,
                 text="Map visualization unavailable.\n\nPlease install tkintermapview:\npip install tkintermapview",
                 font=('Arial', 12), bg='#ffffff', fg='#ff0000').pack(expand=True)
 
+    # fill both dropdowns with available SCATS sites
     def updateSiteLists(self):
-        # fill both dropdowns with available SCATS sites
         sites = self.map_viewer.getSites()
         self.originCombo['values'] = sites
         self.destCombo['values'] = sites
@@ -163,18 +172,21 @@ class TBRGSGUI:
             self.originCombo.set(str(sites[0]))
             self.destCombo.set(str(sites[1]))
 
+    # pan the map to the selected origin site
     def locateOrigin(self):
         site = self.originVar.get()
         if site:
             self.map_viewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
+    # pan the map to the selected destination site
     def locateDest(self):
         site = self.destVar.get()
         if site:
             self.map_viewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
+    # rebuild the route selector buttons to match the latest search results
     def populateRouteBtns(self):
         for w in self.routeBtnsRow.winfo_children():
             w.destroy()
@@ -194,6 +206,7 @@ class TBRGSGUI:
                             relief='sunken' if i == 0 else 'raised')
             btn.pack(side='left', padx=3, pady=3)
 
+    # highlight the chosen route on the map and press its button in
     def selectRoute(self, idx):
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.currentPaths[idx]
@@ -202,13 +215,14 @@ class TBRGSGUI:
         for i, btn in enumerate(self.routeBtnsRow.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
+    # wipe the drawn route off the map and clear the results text box
     def clearRoute(self):
         self.map_viewer.clearRoute()
         self.resultsText.delete(1.0, tk.END)
         self.statusVar.set("Route cleared from map.")
 
+    # grab and validate origin, destination and departure hour from the form
     def getUserInput(self):
-        # grab and validate origin/dest/time from the form
         originStr = self.originVar.get()
         destStr = self.destVar.get()
 
@@ -236,8 +250,8 @@ class TBRGSGUI:
 
         return origin, dest, hour
 
+    # kick off a route search using all 6 algorithms and show the top results
     def findRoutes(self):
-        # run all 6 algorithms and collect up to 5 unique routes
         origin, dest, hour = self.getUserInput()
         if origin is None:
             return
@@ -267,6 +281,7 @@ class TBRGSGUI:
 
         self.displayResults(origin, dest, hour, modelName, paths)
 
+    # format and print all found routes into the scrollable results box
     def displayResults(self, origin, dest, hour, modelName, paths):
         SEP = "=" * 40
         self.resultsText.insert(tk.END, SEP + "\n")
@@ -314,6 +329,7 @@ class TBRGSGUI:
 
         self.resultsText.insert(tk.END, SEP + "\n")
 
+    # run all 6 algorithms on the same trip and print a side-by-side comparison
     def compareAlgos(self):
         origin, dest, hour = self.getUserInput()
         if origin is None:

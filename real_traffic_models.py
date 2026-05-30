@@ -30,6 +30,7 @@ class RealTrafficPredictor:
         self.scaler = StandardScaler()
         self.trainingHistory = {}
 
+    # read the SCATS Excel file, flatten it into sequences and split train/test
     def loadData(self, excelFile='Scats Data October 2006.xls'):
         print("--- Loading traffic data from Excel ---")
 
@@ -120,6 +121,7 @@ class RealTrafficPredictor:
             'y_test': y_test,
         }
 
+    # define and compile a stacked LSTM network for traffic volume prediction
     def buildLSTM(self):
         model = Sequential([
             Input(shape=(self.seqLen, 1)),
@@ -136,6 +138,7 @@ class RealTrafficPredictor:
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
 
+    # define and compile a stacked GRU network for traffic volume prediction
     def buildGRU(self):
         model = Sequential([
             Input(shape=(self.seqLen, 1)),
@@ -152,6 +155,7 @@ class RealTrafficPredictor:
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
 
+    # train the LSTM model with early stopping and store it internally
     def trainLSTM(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
         if verbose:
             print("--- Training LSTM model ---")
@@ -186,6 +190,7 @@ class RealTrafficPredictor:
 
         return model
 
+    # train the GRU model with early stopping and store it internally
     def trainGRU(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
         if verbose:
             print("--- Training GRU model ---")
@@ -220,6 +225,7 @@ class RealTrafficPredictor:
 
         return model
 
+    # fit an XGBoost regressor with tuned hyperparameters and store it internally
     def trainXGB(self, X_train, y_train, X_test, y_test, verbose=True):
         if verbose:
             print("--- Training XGBoost model ---")
@@ -251,6 +257,7 @@ class RealTrafficPredictor:
 
         return model
 
+    # compute MAE, RMSE and R2 on the test set and print them
     def evalModel(self, name, model, X_test, y_test):
         if name in ['lstm', 'gru']:
             yPred = model.predict(X_test, verbose=0).flatten()
@@ -272,6 +279,7 @@ class RealTrafficPredictor:
         self.trainingHistory[name]['test_rmse'] = rmse
         self.trainingHistory[name]['test_r2'] = r2
 
+    # print how much each input feature contributed to the XGBoost model
     def printFeatureImportance(self, model):
         importance = model.feature_importances_
         print("\nXGBoost Feature Importance:")
@@ -281,6 +289,7 @@ class RealTrafficPredictor:
         if importance.shape[0] > self.seqLen + 1:
             print(f"  Day of week:            {importance[self.seqLen + 1]:.3f}")
 
+    # run the chosen model on the given traffic sequence and return a flow prediction
     def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
         # fall back to time-of-day heuristic if no model or sequence
         if lastSeq is None:
@@ -311,6 +320,7 @@ class RealTrafficPredictor:
 
         return max(5, int(predVolume))
 
+    # estimate traffic flow from the hour of day when no trained model is available
     def fallbackPredict(self, hourOfDay):
         # rough hourly traffic profile when no model is available
         if 7 <= hourOfDay <= 9:
@@ -324,6 +334,7 @@ class RealTrafficPredictor:
         else:
             return 70
 
+    # write all trained models and the scaler to disk
     def saveModels(self, folder='saved_models'):
         os.makedirs(folder, exist_ok=True)
 
@@ -342,6 +353,7 @@ class RealTrafficPredictor:
         joblib.dump(self.scaler, f'{folder}/scaler.joblib')
         print(f"Scaler saved to {folder}/scaler.joblib")
 
+    # load previously saved models and scaler from disk, returns False if nothing found
     def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
             print(f"Folder {folder} not found. Will train new models.")
@@ -380,6 +392,7 @@ class RealTrafficPredictor:
         return loaded
 
 
+# convenience function to train all three models in one go and save them
 def trainAllModels():
     print("--- Training all traffic prediction models ---")
 

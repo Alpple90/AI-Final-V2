@@ -11,6 +11,7 @@ from graph_builder import buildGraph, getGraphInfo
 from gui import TBRGSGUI
 
 
+# train all three models on the SCATS data and save them to disk
 def _train_models(predictor):
     print("--- Loading traffic data for training ---")
     data = predictor.loadData()
@@ -32,6 +33,7 @@ def _train_models(predictor):
     print("--- Training complete ---")
 
 
+# boot up the whole app: load data, build the graph, init models, launch the GUI
 def main():
     print("--- Loading map data ---")
     mapViewer = SCATSMapViewer()
