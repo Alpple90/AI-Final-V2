@@ -6,12 +6,12 @@ Pathfinding with 6 Search Algorithms - Supports Top-K Routes
 from heapq import heappush, heappop
 import math
 from config import DEFAULT_K_ROUTES
+from travel_time import calculate_travel_time
 
 
 class PathFinder:
-    def __init__(self, graph, travel_time_calculator, traffic_predictor, coords=None):
+    def __init__(self, graph, traffic_predictor, coords=None):
         self.graph = graph
-        self.tt_calc = travel_time_calculator
         self.traffic_predictor = traffic_predictor
         self.coords = coords or {}
         self.current_model = 'lstm'
@@ -35,12 +35,9 @@ class PathFinder:
             return True
         return False
     
-    def set_coordinates(self, coords):
-        self.coords = coords
-
     def _get_edge_cost(self, from_node, to_node, distance, hour):
         predicted_flow = self.traffic_predictor.predict(self.current_model, None, hour)
-        return self.tt_calc.calculate_travel_time(distance, predicted_flow)
+        return calculate_travel_time(distance, predicted_flow)
     
     def _calculate_path_time(self, path, hour):
         if len(path) < 2:
