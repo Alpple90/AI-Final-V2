@@ -2,6 +2,7 @@
 import unittest
 import sys
 import os
+from io import StringIO
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -135,6 +136,11 @@ class TestPathFinderEdgeCases(unittest.TestCase):
 class TestFindUniquePaths(unittest.TestCase):
     def setUp(self):
         self.pf = makePathFinder()
+        self._stdout = sys.stdout
+        sys.stdout = StringIO()
+
+    def tearDown(self):
+        sys.stdout = self._stdout
 
     # test 13: findUniquePaths returns at most 5 routes
     def test_findUniquePaths_atMostFive(self):
