@@ -10,7 +10,6 @@ Usage: python main.py
 """
 
 import tkinter as tk
-import os
 import warnings
 warnings.filterwarnings('ignore')
 

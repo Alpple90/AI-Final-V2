@@ -35,7 +35,6 @@ class SCATSMapViewer:
         self.markers = {}         # SCATS number -> marker object
         self.current_route_items = []  # Temporary route elements
         self.network_paths = []   # Network edge path objects
-        self.network_visible = True
         self.is_initialized = False
         
     def load_coordinates(self):
@@ -93,21 +92,6 @@ class SCATSMapViewer:
         
         self.is_initialized = True
     
-    def toggle_network(self):
-        """Show or hide the network edges."""
-        if self.network_visible:
-            for p in self.network_paths:
-                try:
-                    p.delete()
-                except:
-                    pass
-            self.network_paths = []
-            self.network_visible = False
-        else:
-            self.network_paths = draw_edges(self.map_widget, self.coords)
-            self.network_visible = True
-        return self.network_visible
-
     def locate_site(self, site_str):
         """Center map on a specific SCATS site"""
         if not self.map_widget or site_str not in self.coords:
@@ -158,14 +142,6 @@ class SCATSMapViewer:
                 self.markers[node_str] = m
                 self.current_route_items.append((node_str, m))
 
-    def draw_all_routes(self, paths, highlight_idx=0):
-        """Draw all routes, highlighting the one at highlight_idx."""
-        self.clear_route()
-        route_colors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
-        for i, (path, _, _) in enumerate(paths):
-            color = route_colors[i % len(route_colors)]
-            self.draw_route(path, color=color, is_best=(i == highlight_idx))
-    
     def clear_route(self):
         """Clear the currently displayed route"""
         highlighted_nodes = set()

@@ -5,7 +5,7 @@ Pathfinding with 6 Search Algorithms - Supports Top-K Routes
 
 from heapq import heappush, heappop
 import math
-from config import DEFAULT_K_ROUTES, MAX_VISITS_PER_NODE
+from config import DEFAULT_K_ROUTES
 
 
 class PathFinder:
@@ -388,24 +388,3 @@ class PathFinder:
         results.sort(key=lambda x: x[1])
         return results[:max_paths]
 
-    def get_graph_info(self):
-        total_nodes = len(self.graph)
-        total_edges = sum(len(neighbors) for neighbors in self.graph.values()) // 2
-        return {
-            'total_nodes': total_nodes,
-            'total_edges': total_edges,
-            'isolated_nodes': sum(1 for n in self.graph.values() if not n)
-        }
-    
-    def get_algorithm_list(self):
-        return list(self.algorithms.keys())
-    
-    def get_algorithm_info(self):
-        return {
-            'bfs': {'name': 'BFS', 'optimal': False, 'complete': True},
-            'dfs': {'name': 'DFS', 'optimal': False, 'complete': False},
-            'greedy': {'name': 'Greedy Best-First', 'optimal': False, 'complete': False},
-            'astar': {'name': 'A*', 'optimal': True, 'complete': True},
-            'dijkstra': {'name': "Dijkstra's", 'optimal': True, 'complete': True},
-            'bidirectional': {'name': 'Bidirectional A*', 'optimal': True, 'complete': True}
-        }

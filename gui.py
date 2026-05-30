@@ -27,7 +27,6 @@ class TBRGSGUI:
         self.results_text = None
         self.status_var = None
         self.current_paths = []
-        self.selected_route_idx = 0
         
         # Setup window
         self._setup_window()
@@ -120,29 +119,26 @@ class TBRGSGUI:
         row1 = tk.Frame(button_frame, bg='#f0f0f0')
         row1.pack(fill='x', pady=(0, 5))
 
-        self.find_button = tk.Button(row1, text="FIND ROUTES",
-                                     command=self.find_routes,
-                                     bg='#2e7d32', fg='white',
-                                     font=('Arial', 11, 'bold'),
-                                     padx=20, pady=5)
-        self.find_button.pack(side='left', padx=5)
+        tk.Button(row1, text="FIND ROUTES",
+                  command=self.find_routes,
+                  bg='#2e7d32', fg='white',
+                  font=('Arial', 11, 'bold'),
+                  padx=20, pady=5).pack(side='left', padx=5)
 
-        self.clear_button = tk.Button(row1, text="CLEAR MAP",
-                                      command=self.clear_route,
-                                      bg='#ef6c00', fg='white',
-                                      font=('Arial', 10),
-                                      padx=15, pady=5)
-        self.clear_button.pack(side='left', padx=5)
+        tk.Button(row1, text="CLEAR MAP",
+                  command=self.clear_route,
+                  bg='#ef6c00', fg='white',
+                  font=('Arial', 10),
+                  padx=15, pady=5).pack(side='left', padx=5)
 
         row2 = tk.Frame(button_frame, bg='#f0f0f0')
         row2.pack(fill='x')
 
-        self.compare_button = tk.Button(row2, text="COMPARE ALGORITHMS",
-                                        command=self.compare_algorithms,
-                                        bg='#9c27b0', fg='white',
-                                        font=('Arial', 10),
-                                        padx=15, pady=5)
-        self.compare_button.pack(side='left', padx=5)
+        tk.Button(row2, text="COMPARE ALGORITHMS",
+                  command=self.compare_algorithms,
+                  bg='#9c27b0', fg='white',
+                  font=('Arial', 10),
+                  padx=15, pady=5).pack(side='left', padx=5)
 
     def _build_route_selector(self, parent):
         self.route_selector_frame = tk.LabelFrame(parent, text="Display Route",
@@ -216,7 +212,6 @@ class TBRGSGUI:
             btn.pack(side='left', padx=3, pady=3)
 
     def _select_route(self, idx):
-        self.selected_route_idx = idx
         route_colors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.current_paths[idx]
         self.map_viewer.clear_route()
