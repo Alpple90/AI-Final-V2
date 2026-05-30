@@ -53,15 +53,20 @@ class TBRGSGUI:
         self.right_panel.pack(side='right', fill='both', expand=True, padx=(5, 10), pady=10)
         
         # Title
-        tk.Label(left_panel, text="TRAFFIC-BASED ROUTE GUIDANCE", 
-                font=('Arial', 14, 'bold'), bg='#f0f0f0', fg='#1a237e').pack(pady=(0, 15))
-        
+        tk.Label(left_panel, text="TRAFFIC-BASED ROUTE GUIDANCE",
+                font=('Arial', 14, 'bold'), bg='#f0f0f0', fg='#1a237e').pack(pady=(0, 5))
+
+        # Status bar (above trip information)
+        self.status_var = tk.StringVar(value="")
+        tk.Label(left_panel, textvariable=self.status_var, font=('Arial', 9),
+                bg='#f0f0f0', fg='#2e7d32', wraplength=LEFT_PANEL_WIDTH-20,
+                justify='left').pack(fill='x', padx=10, pady=(0, 10))
+
         # Build all frames
         self._build_input_frame(left_panel)
         self._build_model_frame(left_panel)
         self._build_button_frame(left_panel)
         self._build_results_frame(left_panel)
-        self._build_status_bar()
     
     def _build_input_frame(self, parent):
         input_frame = tk.LabelFrame(parent, text="Trip Information", 
@@ -139,12 +144,6 @@ class TBRGSGUI:
         self.results_text = scrolledtext.ScrolledText(results_frame, height=14, 
                                                        width=55, font=('Courier', 9))
         self.results_text.pack(fill='both', expand=True)
-    
-    def _build_status_bar(self):
-        self.status_var = tk.StringVar(value="Ready. Select origin and destination to find routes.")
-        status_bar = tk.Label(self.root, textvariable=self.status_var, 
-                              bd=1, relief='sunken', anchor='w')
-        status_bar.pack(side='bottom', fill='x')
     
     def _init_map(self):
         """Initialize map using map_viewer"""
