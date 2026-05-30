@@ -82,16 +82,16 @@ class TBRGSGUI:
                 bg='#f0f0f0').grid(row=0, column=0, sticky='w', pady=5)
         self.origin_combo = ttk.Combobox(input_frame, textvariable=self.origin_var, width=20)
         self.origin_combo.grid(row=0, column=1, pady=5, padx=(10, 0))
-        tk.Button(input_frame, text="📍", command=self._locate_origin,
-                 font=('Arial', 10), width=3).grid(row=0, column=2, padx=5)
+        tk.Button(input_frame, text="Locate", command=self._locate_origin,
+                 font=('Arial', 8), width=6).grid(row=0, column=2, padx=5)
         
         # Destination
         tk.Label(input_frame, text="Destination SCATS:", font=('Arial', 10), 
                 bg='#f0f0f0').grid(row=1, column=0, sticky='w', pady=5)
         self.dest_combo = ttk.Combobox(input_frame, textvariable=self.dest_var, width=20)
         self.dest_combo.grid(row=1, column=1, pady=5, padx=(10, 0))
-        tk.Button(input_frame, text="📍", command=self._locate_destination,
-                 font=('Arial', 10), width=3).grid(row=1, column=2, padx=5)
+        tk.Button(input_frame, text="Locate", command=self._locate_destination,
+                 font=('Arial', 8), width=6).grid(row=1, column=2, padx=5)
         
         # Time
         tk.Label(input_frame, text="Departure Time:", font=('Arial', 10), 
@@ -282,7 +282,7 @@ class TBRGSGUI:
         self.current_paths = paths
         if paths:
             best_algos = " & ".join(a.upper() for a in paths[0][2])
-            self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
+            self.status_var.set(f"Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
         else:
             self.status_var.set("No routes found. Try different origin/destination.")
         self._populate_route_buttons()
@@ -374,16 +374,16 @@ class TBRGSGUI:
             path, cost, nodes = self.pathfinder.find_path(origin, dest, hour)
 
             if path:
-                self.results_text.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} ✓\n")
+                self.results_text.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")
                 if cost < best_time:
                     best_time = cost
                     best_algo = name
             else:
-                self.results_text.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} ✗\n")
+                self.results_text.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} N\n")
 
         self.results_text.insert(tk.END, "-" * 40 + "\n")
         if best_algo:
-            self.results_text.insert(tk.END, f"\n🏆 {best_algo} ({best_time:.1f} min)\n")
+            self.results_text.insert(tk.END, f"\nBest: {best_algo} ({best_time:.1f} min)\n")
 
         self.results_text.insert(tk.END, "\n" + SEP + "\n")
         self.status_var.set(f"Comparison complete. Best: {best_algo} ({best_time:.1f} min)")

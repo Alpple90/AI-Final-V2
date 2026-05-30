@@ -135,25 +135,28 @@ class SCATSMapViewer:
                 )
                 self.current_route_items.append(line)
 
-        # Mark origin/destination on the highlighted route
+        # Update existing origin/destination markers to highlight them
         if is_best:
-            origin_str = str(path[0])
-            dest_str = str(path[-1])
-            for node_str, marker_colour, text in [
-                (origin_str, '#2e7d32', f"🚗 {origin_str}"),
-                (dest_str,   '#c62828', f"🏁 {dest_str}"),
+            for node_str, marker_colour, label in [
+                (str(path[0]),  '#2e7d32', f"{path[0]} [START]"),
+                (str(path[-1]), '#c62828', f"{path[-1]} [END]"),
             ]:
-                if node_str not in self.coords:
+                if node_str not in self.coords or node_str not in self.markers:
                     continue
+                try:
+                    self.markers[node_str].delete()
+                except:
+                    pass
                 lat, lng = self.coords[node_str]
                 m = self.map_widget.set_marker(
                     lat, lng,
-                    text=text,
+                    text=label,
                     marker_color_circle=marker_colour,
                     marker_color_outside='#ffffff',
-                    font=('Arial', 11, 'bold')
+                    font=('Arial', 12, 'bold')
                 )
-                self.current_route_items.append(m)
+                self.markers[node_str] = m
+                self.current_route_items.append((node_str, m))
 
     def draw_all_routes(self, paths, highlight_idx=0):
         """Draw all routes, highlighting the one at highlight_idx."""
@@ -165,25 +168,31 @@ class SCATSMapViewer:
     
     def clear_route(self):
         """Clear the currently displayed route"""
+        highlighted_nodes = set()
         for item in self.current_route_items:
-            try:
-                item.delete()
-            except:
-                pass
+            if isinstance(item, tuple):
+                node_str, marker = item
+                highlighted_nodes.add(node_str)
+                try:
+                    marker.delete()
+                except:
+                    pass
+            else:
+                try:
+                    item.delete()
+                except:
+                    pass
         self.current_route_items = []
-        
-        # Redraw original markers
+
+        # Restore original markers for any highlighted nodes
         if self.is_initialized:
-            for sid, (lat, lng) in self.coords.items():
-                if sid in self.markers:
-                    try:
-                        self.markers[sid].delete()
-                    except:
-                        pass
-                
+            for sid in highlighted_nodes:
+                if sid not in self.coords:
+                    continue
+                lat, lng = self.coords[sid]
                 colour = NODE_COLOURS.get(sid, '#1a1a2e')
                 self.markers[sid] = self.map_widget.set_marker(
-                    lat, lng, 
+                    lat, lng,
                     text=sid,
                     marker_color_circle=colour,
                     marker_color_outside='#ffffff',
