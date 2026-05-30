@@ -8,6 +8,48 @@ sys.path.insert(0, os.path.dirname(__file__))
 from graph_builder import build_graph, haversine_distance
 from travel_time import calc_travel_time
 from pathfinder import PathFinder
+# import NODE_CONNECTIONS directly to avoid tkintermapview import in map.py
+NODE_CONNECTIONS = {
+    '970':  ['3685', '2846'],
+    '2000': ['3685', '3682', '3812', '4043'],
+    '2200': ['3126', '4063'],
+    '2820': ['3662', '4321', '2825'],
+    '2825': ['2820', '4030', '2827'],
+    '2827': ['2825', '4051'],
+    '2846': ['970'],
+    '3001': ['4262', '3002', '3662', '4821'],
+    '3002': ['4263', '3662', '3001'],
+    '3120': ['4040', '3122', '4035'],
+    '3122': ['3804', '3127', '3120'],
+    '3126': ['3682', '2200', '3127'],
+    '3127': ['3126', '4063', '3122'],
+    '3180': ['4057', '4051'],
+    '3662': ['3001', '3002', '4324', '4335', '2820'],
+    '3682': ['2000', '3126', '3804'],
+    '3685': ['970',  '2000'],
+    '3804': ['3812', '3682', '3122', '4040'],
+    '3812': ['2000', '3804', '4040'],
+    '4030': ['4321', '4032', '4051', '2825'],
+    '4032': ['4034', '4057', '4030', '4321'],
+    '4034': ['4035', '4063', '4032', '4324'],
+    '4035': ['3120', '4034'],
+    '4040': ['4043', '3812', '3804', '3120', '4264', '4272'],
+    '4043': ['2000', '4040', '4273'],
+    '4051': ['4030', '3180', '2827'],
+    '4057': ['4063', '3180', '4032'],
+    '4063': ['3127', '2200', '4057', '4034'],
+    '4262': ['4263', '3001'],
+    '4263': ['4264', '3002', '4262'],
+    '4264': ['4270', '4040', '4324', '4263'],
+    '4270': ['4272', '4264', '4812'],
+    '4272': ['4273', '4040', '4270'],
+    '4273': ['4043', '4272'],
+    '4321': ['4335', '4032', '4030', '2820'],
+    '4324': ['4264', '4034', '3662'],
+    '4335': ['3662', '4321'],
+    '4812': ['4270'],
+    '4821': ['3001'],
+}
 
 
 # tiny 5-node graph so tests don't need Excel or trained models
@@ -153,6 +195,118 @@ class TestFindUniquePaths(unittest.TestCase):
         routes = self.pf.find_unique_paths('970', '2000', max_paths=5)
         path_tuples = [tuple(p) for p, _, _ in routes]
         self.assertEqual(len(path_tuples), len(set(path_tuples)))
+
+
+# Test that returned paths are structurally valid
+class TestRouteValidity(unittest.TestCase):
+    def setUp(self):
+        self.pf = make_path_finder()
+        self.graph = make_mock_graph()
+
+    # Test that path starts at origin and ends at destination
+    def test_path_starts_at_origin_ends_at_dest(self):
+        path, _, _ = self.pf.astar('970', '2000')
+        self.assertIsNotNone(path)
+        self.assertEqual(path[0], 970)
+        self.assertEqual(path[-1], 2000)
+
+    # Test that path contains no repeated nodes (no cycles)
+    def test_path_has_no_cycles(self):
+        path, _, _ = self.pf.astar('970', '4043')
+        self.assertIsNotNone(path)
+        self.assertEqual(len(path), len(set(path)))
+
+    # Test that every consecutive pair in the path is actually connected in the graph
+    def test_path_edges_exist_in_graph(self):
+        path, _, _ = self.pf.astar('970', '2000')
+        self.assertIsNotNone(path)
+        for i in range(len(path) - 1):
+            from_node = str(path[i])
+            to_node = str(path[i + 1])
+            neighbours = [n for n, _ in self.graph.get(from_node, [])]
+            self.assertIn(to_node, neighbours)
+
+    # Test same check holds for BFS path
+    def test_bfs_path_edges_exist_in_graph(self):
+        path, _, _ = self.pf.bfs('970', '4043')
+        self.assertIsNotNone(path)
+        for i in range(len(path) - 1):
+            from_node = str(path[i])
+            to_node = str(path[i + 1])
+            neighbours = [n for n, _ in self.graph.get(from_node, [])]
+            self.assertIn(to_node, neighbours)
+
+
+# Test edge cases for pathfinder and graph
+class TestEdgeCases(unittest.TestCase):
+    def setUp(self):
+        self.pf = make_path_finder()
+
+    # Test that a disconnected node (no outgoing edges) returns None
+    def test_disconnected_node_returns_none(self):
+        # build a graph where '999' exists but has no neighbours
+        isolated_coords = dict(MOCK_COORDS)
+        isolated_coords['999'] = (-37.820, 145.030)
+        isolated_connections = dict(MOCK_CONNECTIONS)
+        isolated_connections['999'] = []
+        graph = build_graph(isolated_connections, isolated_coords)
+        pf = PathFinder(graph, MockPredictor(), isolated_coords)
+        path, _, _ = pf.astar('999', '2000')
+        self.assertIsNone(path)
+
+    # Test that find_unique_paths with max_paths=1 returns exactly 1 route
+    def test_find_unique_paths_max_one(self):
+        routes = self.pf.find_unique_paths('970', '2000', max_paths=1)
+        self.assertEqual(len(routes), 1)
+
+    # Test that an empty graph returns None for any search
+    def test_empty_graph_returns_none(self):
+        pf = PathFinder({}, MockPredictor(), {})
+        path, _, _ = pf.astar('970', '2000')
+        self.assertIsNone(path)
+
+
+# Test structural properties of the real graph built from NODE_CONNECTIONS
+class TestGraphStructure(unittest.TestCase):
+
+    def setUp(self):
+        # use real coords from the xlsx — fall back to mock if file not present
+        try:
+            from map import load_sites
+            sites_df = load_sites()
+            self.coords = {
+                row['SCATS Number']: (row['LAT'], row['LNG'])
+                for _, row in sites_df.iterrows()
+            }
+            self.graph = build_graph(NODE_CONNECTIONS, self.coords)
+            self.real_data = True
+        except Exception:
+            self.real_data = False
+
+    # Test that the real graph is not empty
+    def test_real_graph_not_empty(self):
+        if not self.real_data:
+            self.skipTest('scatsTrueLongLat.xlsx not available')
+        self.assertGreater(len(self.graph), 0)
+
+    # Test that every edge distance is within the 0.1–10 km filter in build_graph
+    def test_all_edge_distances_in_valid_range(self):
+        if not self.real_data:
+            self.skipTest('scatsTrueLongLat.xlsx not available')
+        for node, neighbours in self.graph.items():
+            for neighbour, dist in neighbours:
+                self.assertGreaterEqual(dist, 0.1)
+                self.assertLessEqual(dist, 10.0)
+
+    # Test that every node in the real graph has at least one neighbour
+    def test_all_nodes_have_neighbours(self):
+        if not self.real_data:
+            self.skipTest('scatsTrueLongLat.xlsx not available')
+        # only check nodes that appear in NODE_CONNECTIONS (not isolated coord-only nodes)
+        for node in NODE_CONNECTIONS:
+            if node in self.graph:
+                self.assertGreater(len(self.graph[node]), 0,
+                                   msg=f'Node {node} has no neighbours in graph')
 
 
 if __name__ == '__main__':
