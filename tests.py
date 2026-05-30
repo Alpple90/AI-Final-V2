@@ -29,7 +29,7 @@ MOCK_CONNECTIONS = {
 
 
 class MockPredictor:
-    def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
+    def predict(self, *args, **kwargs):
         return 100
 
 
