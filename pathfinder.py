@@ -372,8 +372,9 @@ class PathFinder:
         return result
 
     def find_unique_paths_all_algorithms(self, start, goal, hour=12, max_paths=5):
-        """Run all 6 algorithms once each, return up to max_paths unique paths sorted by travel time."""
-        seen = set()
+        """Run all 6 algorithms once each, return up to max_paths unique paths sorted by travel time.
+        Returns list of (path, cost, algo_name) tuples."""
+        seen = {}  # path_tuple -> algo_name (first finder)
         results = []
 
         for algo_name, algo_func in self.algorithms.items():
@@ -381,8 +382,8 @@ class PathFinder:
             if path:
                 key = tuple(path)
                 if key not in seen:
-                    seen.add(key)
-                    results.append((path, cost))
+                    seen[key] = algo_name
+                    results.append((path, cost, algo_name))
 
         results.sort(key=lambda x: x[1])
         return results[:max_paths]
