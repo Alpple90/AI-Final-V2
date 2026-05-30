@@ -11,35 +11,31 @@ from graph_builder import buildGraph, getGraphInfo
 from map_visualization import SCATSMapViewer
 
 
+# load saved models, run predictions, print a comparison table and save a plot
 def runEvaluation():
-    print("===========================================")
-    print("ML MODEL COMPARISON - TBRGS")
-    print("===========================================")
+    print("--- ML Model Comparison - TBRGS ---")
 
-    # load data and saved models
-    print("\n--- Loading data ---")
     predictor = RealTrafficPredictor()
     data = predictor.loadData()
 
-    print("\n--- Loading saved models ---")
+    print("--- Loading saved models ---")
     loaded = predictor.loadModels()
     if not loaded:
         print("No saved models found. Run real_traffic_models.py first to train.")
         return
 
-    xTest_lstm = data['X_test_lstm']
-    xTest_xgb  = data['X_test_xgb']
-    yTest      = data['y_test']
+    xTestLstm = data['X_test_lstm']
+    xTestXgb  = data['X_test_xgb']
+    yTest     = data['y_test']
 
-    # collect results for each model
     results = {}
     modelConfigs = [
-        ('LSTM',    'lstm',    xTest_lstm),
-        ('GRU',     'gru',     xTest_lstm),
-        ('XGBoost', 'xgboost', xTest_xgb),
+        ('LSTM',    'lstm',    xTestLstm),
+        ('GRU',     'gru',     xTestLstm),
+        ('XGBoost', 'xgboost', xTestXgb),
     ]
 
-    print("\n--- Generating predictions ---")
+    print("--- Generating predictions ---")
     for displayName, modelKey, xTest in modelConfigs:
         if modelKey not in predictor.models:
             print(f"  {displayName}: model not found, skipping")
@@ -62,23 +58,17 @@ def runEvaluation():
         print("No model results to display.")
         return
 
-    # print comparison table
-    print("\n===========================================")
-    print("ML MODEL COMPARISON")
-    print("===========================================")
-    print(f"{'Model':<12} {'MAE':>8} {'RMSE':>8} {'R2':>8}")
-    print("-------------------------------------------")
+    print(f"\n{'Model':<12} {'MAE':>8} {'RMSE':>8} {'R2':>8}")
+    print("-" * 40)
     for name, metrics in results.items():
         print(f"{name:<12} {metrics['mae']:>8.2f} {metrics['rmse']:>8.2f} {metrics['r2']:>8.4f}")
-    print("-------------------------------------------")
+    print("-" * 40)
 
-    # find best by lowest MAE
     bestName = min(results, key=lambda n: results[n]['mae'])
     print(f"Best model: {bestName} (lowest MAE)")
-    print("===========================================")
 
     # plot predicted vs actual for all models
-    print("\n--- Saving comparison plot ---")
+    print("--- Saving comparison plot ---")
     numModels = len(results)
     fig, axes = plt.subplots(1, numModels, figsize=(6 * numModels, 5))
     if numModels == 1:
@@ -104,8 +94,7 @@ def runEvaluation():
     plt.close()
     print("  Plot saved to model_comparison.png")
 
-    # short written summary
-    print("\n--- Summary ---")
+    print("--- Summary ---")
     bestMetrics = results[bestName]
     print(f"  Best overall model: {bestName}")
     print(f"  MAE={bestMetrics['mae']:.2f}, RMSE={bestMetrics['rmse']:.2f}, R2={bestMetrics['r2']:.4f}")
@@ -113,27 +102,20 @@ def runEvaluation():
     for other in otherNames:
         maeDiff = results[other]['mae'] - bestMetrics['mae']
         print(f"  {bestName} beats {other} by {maeDiff:.2f} MAE units")
-    print(f"  {bestName} produced the lowest prediction error on the held-out test set,")
-    print(f"  making it the recommended model for real-time traffic flow forecasting.")
-    print("---")
 
     runRouteAgreement(predictor)
 
 
 # check whether each ML model recommends the same best route for a set of O/D pairs
 def runRouteAgreement(predictor):
-    print("\n===========================================")
-    print("ROUTE AGREEMENT")
-    print("===========================================")
+    print("--- Route Agreement ---")
     print("Checking if LSTM, GRU and XGBoost recommend the same route\n")
 
-    # load map and build graph
     mapViewer = SCATSMapViewer()
     coords = mapViewer.loadCoords()
     graph = buildGraph(mapViewer.getNodeConnections(), coords)
     pathfinder = PathFinder(graph, predictor, coords)
 
-    # test pairs covering different parts of the network
     testPairs = [
         (970,  2000),
         (970,  4040),
@@ -168,12 +150,10 @@ def runRouteAgreement(predictor):
         routes = {}
         for modelName in models:
             pathfinder.setModel(modelName)
-            # use astar for a consistent single best path per model
             pathfinder.setAlgorithm('astar')
             path, cost, _ = pathfinder.findPath(origin, dest, hour)
             routes[modelName] = tuple(path) if path else None
 
-        # check if all 3 models agree on the same route
         uniqueRoutes = set(r for r in routes.values() if r is not None)
         allAgree = len(uniqueRoutes) == 1
 
@@ -196,7 +176,6 @@ def runRouteAgreement(predictor):
         print("  Models mostly agree — ML model choice has minimal routing impact.")
     else:
         print("  Models disagree on several routes — ML model choice affects routing.")
-    print("===========================================")
 
 
 if __name__ == '__main__':

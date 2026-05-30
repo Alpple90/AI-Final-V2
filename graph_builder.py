@@ -5,14 +5,15 @@ import math
 # calculate the great-circle distance in km between two lat/lng points
 def haversineDistance(lat1, lon1, lat2, lon2):
     R = 6371
-    lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
-    lat2_r, lon2_r = math.radians(lat2), math.radians(lon2)
-    dlat = lat2_r - lat1_r
-    dlon = lon2_r - lon1_r
-    a = math.sin(dlat/2)**2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon/2)**2
+    lat1R, lon1R = math.radians(lat1), math.radians(lon1)
+    lat2R, lon2R = math.radians(lat2), math.radians(lon2)
+    dLat = lat2R - lat1R
+    dLon = lon2R - lon1R
+    a = math.sin(dLat/2)**2 + math.cos(lat1R) * math.cos(lat2R) * math.sin(dLon/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 
+# build weighted adjacency list from connection map and lat/lng coords
 def buildGraph(connections, coords):
     # start with every node having an empty neighbour list
     graph = {node: [] for node in set(connections) | {n for nbrs in connections.values() for n in nbrs}}

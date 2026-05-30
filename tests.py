@@ -44,8 +44,6 @@ def makePathFinder():
     return pf
 
 
-# ---------- graph / travel time tests ----------
-
 # test 1: buildGraph returns a non-empty dict
 class TestBuildGraph(unittest.TestCase):
     def test_buildGraph_returnsNonEmpty(self):
@@ -71,7 +69,6 @@ class TestBuildGraph(unittest.TestCase):
         self.assertGreater(tCongested, tFreeFlow)
 
 
-# ---------- pathfinder basic tests ----------
 
 class TestPathFinderBasic(unittest.TestCase):
     def setUp(self):
@@ -110,7 +107,6 @@ class TestPathFinderBasic(unittest.TestCase):
         self.assertTrue(path is None or cost == 0)
 
 
-# ---------- pathfinder edge case tests ----------
 
 class TestPathFinderEdgeCases(unittest.TestCase):
     def setUp(self):
@@ -136,7 +132,6 @@ class TestPathFinderEdgeCases(unittest.TestCase):
             self.assertIsInstance(node, int)
 
 
-# ---------- top-k / findUniquePaths tests ----------
 
 class TestFindUniquePaths(unittest.TestCase):
     def setUp(self):

@@ -6,8 +6,8 @@ from config import MAP_TILE_SERVER, MAP_ZOOM_LEVEL, MAP_LOCATE_ZOOM
 from map import (
     NODE_CONNECTIONS,
     NODE_COLOURS,
-    load_sites,
-    draw_edges
+    loadSites,
+    drawEdges
 )
 
 try:
@@ -29,7 +29,7 @@ class SCATSMapViewer:
 
     # read lat/lng for every SCATS site from the data source and store them
     def loadCoords(self):
-        sitesDF = load_sites()
+        sitesDF = loadSites()
         self.coords = {
             row['SCATS Number']: (row['LAT'], row['LNG'])
             for _, row in sitesDF.iterrows()
@@ -64,8 +64,8 @@ class SCATSMapViewer:
         if not self.mapWidget or not self.coords:
             return
 
-        self.networkPaths = draw_edges(self.mapWidget, self.coords)
-        self.network_visible = True
+        self.networkPaths = drawEdges(self.mapWidget, self.coords)
+        self.networkVisible = True
 
         for sid, (lat, lng) in self.coords.items():
             colour = NODE_COLOURS.get(sid, '#1a1a2e')

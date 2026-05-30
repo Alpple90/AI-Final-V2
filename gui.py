@@ -7,15 +7,15 @@ from config import WINDOW_WIDTH, WINDOW_HEIGHT, LEFT_PANEL_WIDTH
 
 class TBRGSGUI:
 
-    def __init__(self, root, map_viewer, pathfinder):
+    def __init__(self, root, mapViewer, pathfinder):
         self.root = root
-        self.map_viewer = map_viewer
+        self.mapViewer = mapViewer
         self.pathfinder = pathfinder
 
         self.currentModel = tk.StringVar(value='lstm')
         self.originVar = tk.StringVar()
         self.destVar = tk.StringVar()
-        self.time_var = tk.StringVar(value="12:00")
+        self.timeVar = tk.StringVar(value="12:00")
 
         self.mapWidget = None
         self.resultsText = None
@@ -25,7 +25,7 @@ class TBRGSGUI:
         self.setupWindow()
         self.buildGui()
 
-        if self.map_viewer.mapAvailable():
+        if self.mapViewer.mapAvailable():
             self.initMap()
         else:
             self.showMapUnavail()
@@ -82,7 +82,7 @@ class TBRGSGUI:
 
         tk.Label(inputFrame, text="Departure Time:", font=('Arial', 10),
                 bg='#f0f0f0').grid(row=2, column=0, sticky='w', pady=5)
-        tk.Entry(inputFrame, textvariable=self.time_var, width=10,
+        tk.Entry(inputFrame, textvariable=self.timeVar, width=10,
                 font=('Arial', 10)).grid(row=2, column=1, sticky='w', pady=5, padx=(10, 0))
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
@@ -153,8 +153,8 @@ class TBRGSGUI:
 
     # create the map widget and draw the SCATS network on it
     def initMap(self):
-        self.mapWidget = self.map_viewer.createMap(self.rightPanel)
-        self.map_viewer.drawNetwork()
+        self.mapWidget = self.mapViewer.createMap(self.rightPanel)
+        self.mapViewer.drawNetwork()
         self.updateSiteLists()
 
     # show an error message in place of the map when tkintermapview isn't installed
@@ -165,7 +165,7 @@ class TBRGSGUI:
 
     # fill both dropdowns with available SCATS sites
     def updateSiteLists(self):
-        sites = self.map_viewer.getSites()
+        sites = self.mapViewer.getSites()
         self.originCombo['values'] = sites
         self.destCombo['values'] = sites
         if len(sites) >= 2:
@@ -176,14 +176,14 @@ class TBRGSGUI:
     def locateOrigin(self):
         site = self.originVar.get()
         if site:
-            self.map_viewer.locateSite(site)
+            self.mapViewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
     # pan the map to the selected destination site
     def locateDest(self):
         site = self.destVar.get()
         if site:
-            self.map_viewer.locateSite(site)
+            self.mapViewer.locateSite(site)
             self.statusVar.set(f"Located SCATS {site}")
 
     # rebuild the route selector buttons to match the latest search results
@@ -195,7 +195,7 @@ class TBRGSGUI:
                 w.destroy()
 
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
-        for i, (_, total_time, _) in enumerate(self.currentPaths):
+        for i, (_, totalTime, _) in enumerate(self.currentPaths):
             color = routeColors[i % len(routeColors)]
             btn = tk.Button(self.routeBtnsRow,
                             text=f"Route {i+1}",
@@ -210,14 +210,14 @@ class TBRGSGUI:
     def selectRoute(self, idx):
         routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.currentPaths[idx]
-        self.map_viewer.clearRoute()
-        self.map_viewer.drawRoute(path, color=routeColors[idx % len(routeColors)], isBest=True)
+        self.mapViewer.clearRoute()
+        self.mapViewer.drawRoute(path, color=routeColors[idx % len(routeColors)], isBest=True)
         for i, btn in enumerate(self.routeBtnsRow.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
     # wipe the drawn route off the map and clear the results text box
     def clearRoute(self):
-        self.map_viewer.clearRoute()
+        self.mapViewer.clearRoute()
         self.resultsText.delete(1.0, tk.END)
         self.statusVar.set("Route cleared from map.")
 
@@ -242,7 +242,7 @@ class TBRGSGUI:
             return None, None, None
 
         try:
-            timeStr = self.time_var.get()
+            timeStr = self.timeVar.get()
             hour = int(timeStr.split(':')[0]) if ':' in timeStr else int(timeStr)
             hour = max(0, min(23, hour))
         except:
@@ -263,7 +263,7 @@ class TBRGSGUI:
         self.root.update()
 
         self.resultsText.delete(1.0, tk.END)
-        self.map_viewer.clearRoute()
+        self.mapViewer.clearRoute()
 
         self.pathfinder.setModel(modelName)
 
@@ -289,7 +289,7 @@ class TBRGSGUI:
         self.resultsText.insert(tk.END, SEP + "\n")
         self.resultsText.insert(tk.END, f"Origin:    SCATS {origin}\n")
         self.resultsText.insert(tk.END, f"Dest:      SCATS {dest}\n")
-        self.resultsText.insert(tk.END, f"Departure: {self.time_var.get()} (Hour {hour}:00)\n")
+        self.resultsText.insert(tk.END, f"Departure: {self.timeVar.get()} (Hour {hour}:00)\n")
         self.resultsText.insert(tk.END, f"ML Model:  {modelName.upper()}\n")
         self.resultsText.insert(tk.END, SEP + "\n\n")
 
@@ -304,10 +304,10 @@ class TBRGSGUI:
 
         self.resultsText.insert(tk.END, f"Found {len(paths)} unique route(s):\n\n")
 
-        for i, (path, total_time, algos) in enumerate(paths, 1):
+        for i, (path, totalTime, algos) in enumerate(paths, 1):
             algoNames = " & ".join(algoDisplay.get(a, a) for a in algos)
             self.resultsText.insert(tk.END, "─" * 40 + "\n")
-            self.resultsText.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
+            self.resultsText.insert(tk.END, f"ROUTE {i} │ {totalTime:.1f} min\n")
             self.resultsText.insert(tk.END, f"By: {algoNames}\n\n")
 
             # wrap node list so it fits the text box
@@ -347,7 +347,7 @@ class TBRGSGUI:
         self.resultsText.insert(tk.END, "ALGORITHM COMPARISON\n")
         self.resultsText.insert(tk.END, SEP + "\n")
         self.resultsText.insert(tk.END, f"Origin: {origin}  Dest: {dest}\n")
-        self.resultsText.insert(tk.END, f"Time: {self.time_var.get()}  Model: {modelName.upper()}\n\n")
+        self.resultsText.insert(tk.END, f"Time: {self.timeVar.get()}  Model: {modelName.upper()}\n\n")
 
         self.resultsText.insert(tk.END, f"{'Algorithm':<16} {'min':<8} {'Nodes':<7} \n")
         self.resultsText.insert(tk.END, "-" * 40 + "\n")

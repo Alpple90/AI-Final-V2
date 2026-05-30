@@ -86,39 +86,39 @@ class RealTrafficPredictor:
 
         splitIdx = int(len(X) * 0.8)
 
-        X_train_seq = X[:splitIdx]
-        X_test_seq = X[splitIdx:]
-        y_train = y[:splitIdx]
-        y_test = y[splitIdx:]
+        xTrainSeq = X[:splitIdx]
+        xTestSeq = X[splitIdx:]
+        yTrain = y[:splitIdx]
+        yTest = y[splitIdx:]
         timeTrain = timeFeatures[:splitIdx]
         timeTest = timeFeatures[splitIdx:]
 
         # normalize flow values
-        X_train_flat = X_train_seq.reshape(-1, self.seqLen)
-        X_test_flat = X_test_seq.reshape(-1, self.seqLen)
+        xTrainFlat = xTrainSeq.reshape(-1, self.seqLen)
+        xTestFlat = xTestSeq.reshape(-1, self.seqLen)
 
-        self.scaler.fit(X_train_flat)
-        X_train_norm = self.scaler.transform(X_train_flat)
-        X_test_norm = self.scaler.transform(X_test_flat)
+        self.scaler.fit(xTrainFlat)
+        xTrainNorm = self.scaler.transform(xTrainFlat)
+        xTestNorm = self.scaler.transform(xTestFlat)
 
         # reshape for LSTM/GRU
-        X_train_lstm = X_train_norm.reshape(-1, self.seqLen, 1)
-        X_test_lstm = X_test_norm.reshape(-1, self.seqLen, 1)
+        xTrainLstm = xTrainNorm.reshape(-1, self.seqLen, 1)
+        xTestLstm = xTestNorm.reshape(-1, self.seqLen, 1)
 
         # append time features for XGBoost
-        X_train_xgb = np.column_stack([X_train_norm, timeTrain])
-        X_test_xgb = np.column_stack([X_test_norm, timeTest])
+        xTrainXgb = np.column_stack([xTrainNorm, timeTrain])
+        xTestXgb = np.column_stack([xTestNorm, timeTest])
 
-        print(f"Training samples: {len(X_train_lstm)}")
-        print(f"Test samples: {len(X_test_lstm)}")
+        print(f"Training samples: {len(xTrainLstm)}")
+        print(f"Test samples: {len(xTestLstm)}")
 
         return {
-            'X_train_lstm': X_train_lstm,
-            'X_test_lstm': X_test_lstm,
-            'X_train_xgb': X_train_xgb,
-            'X_test_xgb': X_test_xgb,
-            'y_train': y_train,
-            'y_test': y_test,
+            'X_train_lstm': xTrainLstm,
+            'X_test_lstm': xTestLstm,
+            'X_train_xgb': xTrainXgb,
+            'X_test_xgb': xTestXgb,
+            'y_train': yTrain,
+            'y_test': yTest,
         }
 
     # define and compile a stacked LSTM network for traffic volume prediction
@@ -156,11 +156,11 @@ class RealTrafficPredictor:
         return model
 
     # train the LSTM model with early stopping and store it internally
-    def trainLSTM(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
+    def trainLSTM(self, xTrain, yTrain, xTest, yTest, epochs=50, verbose=True):
         if verbose:
             print("--- Training LSTM model ---")
-            print(f"Training samples: {len(X_train)}")
-            print(f"Validation samples: {len(X_test)}")
+            print(f"Training samples: {len(xTrain)}")
+            print(f"Validation samples: {len(xTest)}")
 
         model = self.buildLSTM()
 
@@ -174,8 +174,8 @@ class RealTrafficPredictor:
         os.makedirs('saved_models', exist_ok=True)
 
         history = model.fit(
-            X_train, y_train,
-            validation_data=(X_test, y_test),
+            xTrain, yTrain,
+            validation_data=(xTest, yTest),
             epochs=epochs,
             batch_size=self.batchSize,
             callbacks=[earlyStop],
@@ -186,16 +186,16 @@ class RealTrafficPredictor:
         self.trainingHistory['lstm'] = history.history
 
         if verbose:
-            self.evalModel('lstm', model, X_test, y_test)
+            self.evalModel('lstm', model, xTest, yTest)
 
         return model
 
     # train the GRU model with early stopping and store it internally
-    def trainGRU(self, X_train, y_train, X_test, y_test, epochs=50, verbose=True):
+    def trainGRU(self, xTrain, yTrain, xTest, yTest, epochs=50, verbose=True):
         if verbose:
             print("--- Training GRU model ---")
-            print(f"Training samples: {len(X_train)}")
-            print(f"Validation samples: {len(X_test)}")
+            print(f"Training samples: {len(xTrain)}")
+            print(f"Validation samples: {len(xTest)}")
 
         model = self.buildGRU()
 
@@ -209,8 +209,8 @@ class RealTrafficPredictor:
         os.makedirs('saved_models', exist_ok=True)
 
         history = model.fit(
-            X_train, y_train,
-            validation_data=(X_test, y_test),
+            xTrain, yTrain,
+            validation_data=(xTest, yTest),
             epochs=epochs,
             batch_size=self.batchSize,
             callbacks=[earlyStop],
@@ -221,16 +221,16 @@ class RealTrafficPredictor:
         self.trainingHistory['gru'] = history.history
 
         if verbose:
-            self.evalModel('gru', model, X_test, y_test)
+            self.evalModel('gru', model, xTest, yTest)
 
         return model
 
     # fit an XGBoost regressor with tuned hyperparameters and store it internally
-    def trainXGB(self, X_train, y_train, X_test, y_test, verbose=True):
+    def trainXGB(self, xTrain, yTrain, xTest, yTest, verbose=True):
         if verbose:
             print("--- Training XGBoost model ---")
-            print(f"Training samples: {len(X_train)}")
-            print(f"Feature count: {X_train.shape[1]}")
+            print(f"Training samples: {len(xTrain)}")
+            print(f"Feature count: {xTrain.shape[1]}")
 
         params = {
             'n_estimators': 200,
@@ -247,26 +247,26 @@ class RealTrafficPredictor:
         }
 
         model = xgb.XGBRegressor(**params)
-        model.fit(X_train, y_train, verbose=False)
+        model.fit(xTrain, yTrain, verbose=False)
 
         self.models['xgboost'] = model
 
         if verbose:
-            self.evalModel('xgboost', model, X_test, y_test)
+            self.evalModel('xgboost', model, xTest, yTest)
             self.printFeatureImportance(model)
 
         return model
 
     # compute MAE, RMSE and R2 on the test set and print them
-    def evalModel(self, name, model, X_test, y_test):
+    def evalModel(self, name, model, xTest, yTest):
         if name in ['lstm', 'gru']:
-            yPred = model.predict(X_test, verbose=0).flatten()
+            yPred = model.predict(xTest, verbose=0).flatten()
         else:
-            yPred = model.predict(X_test)
+            yPred = model.predict(xTest)
 
-        mae = mean_absolute_error(y_test, yPred)
-        rmse = np.sqrt(mean_squared_error(y_test, yPred))
-        r2 = r2_score(y_test, yPred)
+        mae = mean_absolute_error(yTest, yPred)
+        rmse = np.sqrt(mean_squared_error(yTest, yPred))
+        r2 = r2_score(yTest, yPred)
 
         print(f"\n{name.upper()} Performance:")
         print(f"  MAE:  {mae:.2f} vehicles/15min")
@@ -404,14 +404,12 @@ def trainAllModels():
 
     predictor.trainLSTM(
         data['X_train_lstm'], data['y_train'],
-        data['X_test_lstm'], data['y_test'],
-        epochs=30
+        data['X_test_lstm'], data['y_test'], epochs=30
     )
 
     predictor.trainGRU(
         data['X_train_lstm'], data['y_train'],
-        data['X_test_lstm'], data['y_test'],
-        epochs=30
+        data['X_test_lstm'], data['y_test'], epochs=30
     )
 
     predictor.trainXGB(
