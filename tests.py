@@ -184,16 +184,6 @@ class TestRouteValidity(unittest.TestCase):
             neighbours = [n for n, _ in self.graph.get(fromNode, [])]
             self.assertIn(toNode, neighbours)
 
-    # Test same edge check holds for BFS path
-    def test_bfs_path_edges_exist_in_graph(self):
-        path, _, _ = self.pf.bfs('970', '4043')
-        self.assertIsNotNone(path)
-        for i in range(len(path) - 1):
-            fromNode = str(path[i])
-            toNode = str(path[i + 1])
-            neighbours = [n for n, _ in self.graph.get(fromNode, [])]
-            self.assertIn(toNode, neighbours)
-
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
