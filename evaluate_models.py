@@ -7,52 +7,52 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from real_traffic_models import RealTrafficPredictor
 from pathfinder import PathFinder
-from graph_builder import buildGraph, getGraphInfo
+from graph_builder import build_graph, get_graph_info
 from map_visualization import SCATSMapViewer
 
 
 # load saved models, run predictions, print a comparison table and save a plot
-def runEvaluation():
+def run_evaluation():
     print("--- ML Model Comparison - TBRGS ---")
 
     predictor = RealTrafficPredictor()
-    data = predictor.loadData()
+    data = predictor.load_data()
 
     print("--- Loading saved models ---")
-    loaded = predictor.loadModels()
+    loaded = predictor.load_models()
     if not loaded:
         print("No saved models found. Run real_traffic_models.py first to train.")
         return
 
-    xTestLstm = data['X_test_lstm']
-    xTestXgb  = data['X_test_xgb']
-    yTest     = data['y_test']
+    x_test_lstm = data['X_test_lstm']
+    x_test_xgb  = data['X_test_xgb']
+    y_test      = data['y_test']
 
     results = {}
-    modelConfigs = [
-        ('LSTM',    'lstm',    xTestLstm),
-        ('GRU',     'gru',     xTestLstm),
-        ('XGBoost', 'xgboost', xTestXgb),
+    model_configs = [
+        ('LSTM',    'lstm',    x_test_lstm),
+        ('GRU',     'gru',     x_test_lstm),
+        ('XGBoost', 'xgboost', x_test_xgb),
     ]
 
     print("--- Generating predictions ---")
-    for displayName, modelKey, xTest in modelConfigs:
-        if modelKey not in predictor.models:
-            print(f"  {displayName}: model not found, skipping")
+    for display_name, model_key, x_test in model_configs:
+        if model_key not in predictor.models:
+            print(f"  {display_name}: model not found, skipping")
             continue
 
-        model = predictor.models[modelKey]
-        if modelKey in ['lstm', 'gru']:
-            yPred = model.predict(xTest, verbose=0).flatten()
+        model = predictor.models[model_key]
+        if model_key in ['lstm', 'gru']:
+            y_pred = model.predict(x_test, verbose=0).flatten()
         else:
-            yPred = model.predict(xTest)
+            y_pred = model.predict(x_test)
 
-        mae  = mean_absolute_error(yTest, yPred)
-        rmse = np.sqrt(mean_squared_error(yTest, yPred))
-        r2   = r2_score(yTest, yPred)
+        mae  = mean_absolute_error(y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        r2   = r2_score(y_test, y_pred)
 
-        results[displayName] = {'mae': mae, 'rmse': rmse, 'r2': r2, 'preds': yPred}
-        print(f"  {displayName} done")
+        results[display_name] = {'mae': mae, 'rmse': rmse, 'r2': r2, 'preds': y_pred}
+        print(f"  {display_name} done")
 
     if not results:
         print("No model results to display.")
@@ -64,25 +64,25 @@ def runEvaluation():
         print(f"{name:<12} {metrics['mae']:>8.2f} {metrics['rmse']:>8.2f} {metrics['r2']:>8.4f}")
     print("-" * 40)
 
-    bestName = min(results, key=lambda n: results[n]['mae'])
-    print(f"Best model: {bestName} (lowest MAE)")
+    best_name = min(results, key=lambda n: results[n]['mae'])
+    print(f"Best model: {best_name} (lowest MAE)")
 
     # plot predicted vs actual for all models
     print("--- Saving comparison plot ---")
-    numModels = len(results)
-    fig, axes = plt.subplots(1, numModels, figsize=(6 * numModels, 5))
-    if numModels == 1:
+    num_models = len(results)
+    fig, axes = plt.subplots(1, num_models, figsize=(6 * num_models, 5))
+    if num_models == 1:
         axes = [axes]
 
     # only plot first 500 samples so the chart stays readable
-    plotLimit = 500
-    xAxis = np.arange(plotLimit)
+    plot_limit = 500
+    x_axis = np.arange(plot_limit)
 
     for ax, (name, metrics) in zip(axes, results.items()):
-        yActual = yTest[:plotLimit]
-        yPredPlot = metrics['preds'][:plotLimit]
-        ax.plot(xAxis, yActual, label='Actual', alpha=0.7)
-        ax.plot(xAxis, yPredPlot, label='Predicted', alpha=0.7)
+        y_actual = y_test[:plot_limit]
+        y_pred_plot = metrics['preds'][:plot_limit]
+        ax.plot(x_axis, y_actual, label='Actual', alpha=0.7)
+        ax.plot(x_axis, y_pred_plot, label='Predicted', alpha=0.7)
         ax.set_title(f"{name}\nMAE={metrics['mae']:.2f}  R²={metrics['r2']:.4f}")
         ax.set_xlabel('Sample')
         ax.set_ylabel('Traffic volume (vehicles/15min)')
@@ -95,28 +95,28 @@ def runEvaluation():
     print("  Plot saved to model_comparison.png")
 
     print("--- Summary ---")
-    bestMetrics = results[bestName]
-    print(f"  Best overall model: {bestName}")
-    print(f"  MAE={bestMetrics['mae']:.2f}, RMSE={bestMetrics['rmse']:.2f}, R2={bestMetrics['r2']:.4f}")
-    otherNames = [n for n in results if n != bestName]
-    for other in otherNames:
-        maeDiff = results[other]['mae'] - bestMetrics['mae']
-        print(f"  {bestName} beats {other} by {maeDiff:.2f} MAE units")
+    best_metrics = results[best_name]
+    print(f"  Best overall model: {best_name}")
+    print(f"  MAE={best_metrics['mae']:.2f}, RMSE={best_metrics['rmse']:.2f}, R2={best_metrics['r2']:.4f}")
+    other_names = [n for n in results if n != best_name]
+    for other in other_names:
+        mae_diff = results[other]['mae'] - best_metrics['mae']
+        print(f"  {best_name} beats {other} by {mae_diff:.2f} MAE units")
 
-    runRouteAgreement(predictor)
+    run_route_agreement(predictor)
 
 
 # check whether each ML model recommends the same best route for a set of O/D pairs
-def runRouteAgreement(predictor):
+def run_route_agreement(predictor):
     print("--- Route Agreement ---")
     print("Checking if LSTM, GRU and XGBoost recommend the same route\n")
 
-    mapViewer = SCATSMapViewer()
-    coords = mapViewer.loadCoords()
-    graph = buildGraph(mapViewer.getNodeConnections(), coords)
+    map_viewer = SCATSMapViewer()
+    coords = map_viewer.load_coords()
+    graph = build_graph(map_viewer.get_node_connections(), coords)
     pathfinder = PathFinder(graph, predictor, coords)
 
-    testPairs = [
+    test_pairs = [
         (970,  2000),
         (970,  4040),
         (3001, 4812),
@@ -143,40 +143,40 @@ def runRouteAgreement(predictor):
     models = ['lstm', 'gru', 'xgboost']
     hour = 8  # morning peak
 
-    agreeCount = 0
-    totalPairs = 0
+    agree_count = 0
+    total_pairs = 0
 
-    for origin, dest in testPairs:
+    for origin, dest in test_pairs:
         routes = {}
-        for modelName in models:
-            pathfinder.setModel(modelName)
-            pathfinder.setAlgorithm('astar')
-            path, cost, _ = pathfinder.findPath(origin, dest, hour)
-            routes[modelName] = tuple(path) if path else None
+        for model_name in models:
+            pathfinder.set_model(model_name)
+            pathfinder.set_algorithm('astar')
+            path, cost, _ = pathfinder.find_path(origin, dest, hour)
+            routes[model_name] = tuple(path) if path else None
 
-        uniqueRoutes = set(r for r in routes.values() if r is not None)
-        allAgree = len(uniqueRoutes) == 1
+        unique_routes = set(r for r in routes.values() if r is not None)
+        all_agree = len(unique_routes) == 1
 
-        if allAgree:
-            agreeCount += 1
-        totalPairs += 1
+        if all_agree:
+            agree_count += 1
+        total_pairs += 1
 
-        status = "AGREE" if allAgree else "DIFFER"
+        status = "AGREE" if all_agree else "DIFFER"
         print(f"  {origin} -> {dest}: {status}")
-        if not allAgree:
-            for modelName, route in routes.items():
-                routeStr = ' -> '.join(str(n) for n in route) if route else 'No path'
-                print(f"    {modelName.upper()}: {routeStr}")
+        if not all_agree:
+            for model_name, route in routes.items():
+                route_str = ' -> '.join(str(n) for n in route) if route else 'No path'
+                print(f"    {model_name.upper()}: {route_str}")
 
-    agreePct = (agreeCount / totalPairs) * 100 if totalPairs > 0 else 0
-    print(f"\n  Agreement rate: {agreeCount}/{totalPairs} pairs ({agreePct:.0f}%)")
-    if agreePct == 100:
+    agree_pct = (agree_count / total_pairs) * 100 if total_pairs > 0 else 0
+    print(f"\n  Agreement rate: {agree_count}/{total_pairs} pairs ({agree_pct:.0f}%)")
+    if agree_pct == 100:
         print("  All models recommend the same route for every pair.")
-    elif agreePct >= 75:
+    elif agree_pct >= 75:
         print("  Models mostly agree — ML model choice has minimal routing impact.")
     else:
         print("  Models disagree on several routes — ML model choice affects routing.")
 
 
 if __name__ == '__main__':
-    runEvaluation()
+    run_evaluation()

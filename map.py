@@ -3,7 +3,7 @@ import tkintermapview
 import pandas as pd
 
 TRUE_FILE = "scatsTrueLongLat.xlsx"
- 
+
 NODE_CONNECTIONS = {
     '970':  ['3685', '2846'],
     '2000': ['3685', '3682', '3812', '4043'],
@@ -45,7 +45,7 @@ NODE_CONNECTIONS = {
     '4812': ['4270'],
     '4821': ['3001'],
 }
- 
+
 NODE_COLOURS = {
     '970':  '#e63946', '2000': '#457b9d', '2200': '#2a9d8f',
     '2820': '#e9c46a', '2825': '#f4a261', '2827': '#264653',
@@ -61,10 +61,10 @@ NODE_COLOURS = {
     '4273': '#52b788', '4321': '#c9184a', '4324': '#ff9f1c',
     '4335': '#2ec4b6', '4812': '#e71d36', '4821': '#011627',
 }
- 
- 
+
+
 # read excel, split lat/long column, strip leading zeros from SCATS numbers
-def loadSites():
+def load_sites():
     df = pd.read_excel(TRUE_FILE)
     df[['LAT', 'LNG']] = df['Lat Long'].str.split(expand=True).astype(float)
     df['SCATS Number'] = df['SCATS Number'].astype(str).str.lstrip('0').str.strip()
@@ -73,7 +73,7 @@ def loadSites():
 
 
 # draw each edge once by tracking sorted node pairs
-def drawEdges(mapWidget, coords):
+def draw_edges(map_widget, coords):
     drawn = set()
     paths = []
     for a, neighbours in NODE_CONNECTIONS.items():
@@ -88,34 +88,34 @@ def drawEdges(mapWidget, coords):
             drawn.add(key)
             la, lo = coords[a]
             lb, lo2 = coords[b]
-            p = mapWidget.set_path([(la, lo), (lb, lo2)], color='#888888', width=2)
+            p = map_widget.set_path([(la, lo), (lb, lo2)], color='#888888', width=2)
             paths.append(p)
     return paths
 
 
 if __name__ == '__main__':
-    sites = loadSites()
+    sites = load_sites()
     coords = {r['SCATS Number']: (r['LAT'], r['LNG']) for _, r in sites.iterrows()}
 
     root = tk.Tk()
     root.title('SCATS Node Graph')
     root.geometry('1200x800')
 
-    mapWidget = tkintermapview.TkinterMapView(root, corner_radius=0)
-    mapWidget.pack(fill='both', expand=True)
-    mapWidget.set_tile_server(
+    map_widget = tkintermapview.TkinterMapView(root, corner_radius=0)
+    map_widget.pack(fill='both', expand=True)
+    map_widget.set_tile_server(
         'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
     )
     lats = [c[0] for c in coords.values()]
     lngs = [c[1] for c in coords.values()]
-    mapWidget.set_position(sum(lats) / len(lats), sum(lngs) / len(lngs))
-    mapWidget.set_zoom(13)
+    map_widget.set_position(sum(lats) / len(lats), sum(lngs) / len(lngs))
+    map_widget.set_zoom(13)
 
-    drawEdges(mapWidget, coords)
+    draw_edges(map_widget, coords)
 
     for _, row in sites.iterrows():
         sid = row['SCATS Number']
-        mapWidget.set_marker(
+        map_widget.set_marker(
             row['LAT'], row['LNG'],
             text=sid,
             marker_color_circle=NODE_COLOURS.get(sid, '#1a1a2e'),

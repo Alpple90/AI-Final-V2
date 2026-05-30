@@ -12,32 +12,32 @@ from config import (
 _INTERSECTION_DELAY_MIN = INTERSECTION_DELAY_SEC / 60
 
 
-def flowToSpeed(flowPerHour):
+def flow_to_speed(flow_per_hour):
     # free flow below threshold, otherwise use quadratic model
-    if flowPerHour <= FREE_FLOW_THRESHOLD:
+    if flow_per_hour <= FREE_FLOW_THRESHOLD:
         return SPEED_LIMIT_KPH
 
-    discriminant = FLOW_TO_SPEED_B**2 - 4 * FLOW_TO_SPEED_A * (-flowPerHour)
+    discriminant = FLOW_TO_SPEED_B**2 - 4 * FLOW_TO_SPEED_A * (-flow_per_hour)
     if discriminant < 0:
         return 32
 
-    sqrtDisc = math.sqrt(discriminant)
+    sqrt_disc = math.sqrt(discriminant)
     speeds = [s for s in [
-        (-FLOW_TO_SPEED_B + sqrtDisc) / (2 * FLOW_TO_SPEED_A),
-        (-FLOW_TO_SPEED_B - sqrtDisc) / (2 * FLOW_TO_SPEED_A),
+        (-FLOW_TO_SPEED_B + sqrt_disc) / (2 * FLOW_TO_SPEED_A),
+        (-FLOW_TO_SPEED_B - sqrt_disc) / (2 * FLOW_TO_SPEED_A),
     ] if s > 0]
 
     if not speeds:
         return 32
 
-    if flowPerHour <= CAPACITY_FLOW:
+    if flow_per_hour <= CAPACITY_FLOW:
         return min(max(speeds), SPEED_LIMIT_KPH)
     return min(speeds)
 
 
 # convert a road segment distance and 15-min flow count into a travel time in minutes
-def calcTravelTime(distanceKm, flowPer15min):
-    speed = min(flowToSpeed(flowPer15min * 4), SPEED_LIMIT_KPH)
+def calc_travel_time(distance_km, flow_per_15min):
+    speed = min(flow_to_speed(flow_per_15min * 4), SPEED_LIMIT_KPH)
     if speed <= 0.1:
         return 999
-    return round((distanceKm / speed) * 60 + _INTERSECTION_DELAY_MIN, 2)
+    return round((distance_km / speed) * 60 + _INTERSECTION_DELAY_MIN, 2)
