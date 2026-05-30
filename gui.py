@@ -281,12 +281,13 @@ class TBRGSGUI:
 
         self.current_paths = paths
         if paths:
-            self.map_viewer.draw_all_routes(paths)
             best_algos = " & ".join(a.upper() for a in paths[0][2])
             self.status_var.set(f"✓ Found {len(paths)} unique route(s). Best: {paths[0][1]:.1f} minutes ({best_algos})")
         else:
             self.status_var.set("No routes found. Try different origin/destination.")
         self._populate_route_buttons()
+        if paths:
+            self._select_route(0)
 
         self._display_results(origin, dest, hour, model_name, paths)
     
