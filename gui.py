@@ -113,29 +113,35 @@ class TBRGSGUI:
     def _build_button_frame(self, parent):
         button_frame = tk.Frame(parent, bg='#f0f0f0')
         button_frame.pack(fill='x', pady=(0, 10))
-        
-        self.find_button = tk.Button(button_frame, text="FIND ROUTES", 
+
+        row1 = tk.Frame(button_frame, bg='#f0f0f0')
+        row1.pack(fill='x', pady=(0, 5))
+
+        self.find_button = tk.Button(row1, text="FIND ROUTES",
                                      command=self.find_routes,
-                                     bg='#2e7d32', fg='white', 
-                                     font=('Arial', 11, 'bold'), 
+                                     bg='#2e7d32', fg='white',
+                                     font=('Arial', 11, 'bold'),
                                      padx=20, pady=5)
         self.find_button.pack(side='left', padx=5)
-        
-        self.clear_button = tk.Button(button_frame, text="CLEAR MAP", 
+
+        self.clear_button = tk.Button(row1, text="CLEAR MAP",
                                       command=self.clear_route,
-                                      bg='#ef6c00', fg='white', 
-                                      font=('Arial', 10), 
+                                      bg='#ef6c00', fg='white',
+                                      font=('Arial', 10),
                                       padx=15, pady=5)
         self.clear_button.pack(side='left', padx=5)
-        
-        self.compare_button = tk.Button(button_frame, text="COMPARE ALGORITHMS",
+
+        row2 = tk.Frame(button_frame, bg='#f0f0f0')
+        row2.pack(fill='x')
+
+        self.compare_button = tk.Button(row2, text="COMPARE ALGORITHMS",
                                         command=self.compare_algorithms,
                                         bg='#9c27b0', fg='white',
                                         font=('Arial', 10),
                                         padx=15, pady=5)
         self.compare_button.pack(side='left', padx=5)
 
-        self.network_button = tk.Button(button_frame, text="HIDE NETWORK",
+        self.network_button = tk.Button(row2, text="HIDE NETWORK",
                                         command=self._toggle_network,
                                         bg='#37474f', fg='white',
                                         font=('Arial', 10),
