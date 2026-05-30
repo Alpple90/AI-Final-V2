@@ -268,8 +268,7 @@ class TBRGSGUI:
             algo_names = " & ".join(algo_display.get(a, a) for a in algos)
             self.results_text.insert(tk.END, "─" * 40 + "\n")
             self.results_text.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
-            self.results_text.insert(tk.END, f"By: {algo_names}\n")
-            self.results_text.insert(tk.END, "─" * 40 + "\n")
+            self.results_text.insert(tk.END, f"By: {algo_names}\n\n")
 
             # Wrap path nodes at 40 chars
             nodes = [str(n) for n in path]
