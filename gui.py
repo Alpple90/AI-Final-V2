@@ -217,7 +217,10 @@ class TBRGSGUI:
 
     def _select_route(self, idx):
         self.selected_route_idx = idx
-        self.map_viewer.draw_all_routes(self.current_paths, highlight_idx=idx)
+        route_colors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
+        path, _, _ = self.current_paths[idx]
+        self.map_viewer.clear_route()
+        self.map_viewer.draw_route(path, color=route_colors[idx % len(route_colors)], is_best=True)
         for i, btn in enumerate(self.route_buttons_row.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
