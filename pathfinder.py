@@ -277,19 +277,24 @@ class PathFinder:
         goalStr = str(goal)
 
         if startStr not in self.graph or goalStr not in self.graph:
+            print(f"[Yen's] ({self.currentAlgorithm}) {start} or {goal} not in graph, skipping")
             return []
 
-        firstPath, firstCost, _ = self.findPath(start, goal, hour)
+        print(f"[Yen's] ({self.currentAlgorithm}) searching {start} -> {goal}, up to {k} paths, hour={hour}")
+
+        firstPath, firstCost, nodesExp = self.findPath(start, goal, hour)
         if not firstPath:
+            print(f"[Yen's] ({self.currentAlgorithm}) no initial path found")
             return []
 
         allPaths.append((firstPath, firstCost))
-        print(f"Path 1 found: {firstPath} (cost={firstCost})")
+        print(f"[Yen's] ({self.currentAlgorithm}) path 1: {' -> '.join(str(n) for n in firstPath)} | {firstCost:.2f} min | {len(firstPath)} nodes | {nodesExp} expanded")
 
         potentialPaths = []  # min-heap of (cost, path)
 
         for kIdx in range(1, k):
             lastPath = allPaths[-1][0]
+            candidatesAdded = 0
 
             for i in range(len(lastPath) - 1):
                 spurNode = lastPath[i]
@@ -320,13 +325,15 @@ class PathFinder:
                     totalCost = self._calcPathTime(totalPath, hour)
                     if totalPath not in [p for p, _ in allPaths]:
                         heappush(potentialPaths, (totalCost, totalPath))
+                        candidatesAdded += 1
 
             if not potentialPaths:
+                print(f"[Yen's] ({self.currentAlgorithm}) no more candidates after path {kIdx}, stopping at {kIdx} path(s)")
                 break
 
             bestCost, bestPath = heappop(potentialPaths)
             allPaths.append((bestPath, bestCost))
-            print(f"Path {kIdx+1} found: {bestPath} (cost={bestCost})")
+            print(f"[Yen's] ({self.currentAlgorithm}) path {kIdx+1}: {' -> '.join(str(n) for n in bestPath)} | {bestCost:.2f} min | {len(bestPath)} nodes | {candidatesAdded} candidate(s) generated")
 
         allPaths.sort(key=lambda x: x[1])
 
