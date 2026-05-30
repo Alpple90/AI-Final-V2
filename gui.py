@@ -266,6 +266,7 @@ class TBRGSGUI:
 
         for i, (path, total_time, algos) in enumerate(paths, 1):
             algo_names = " & ".join(algo_display.get(a, a) for a in algos)
+            self.results_text.insert(tk.END, "─" * 40 + "\n")
             self.results_text.insert(tk.END, f"ROUTE {i} │ {total_time:.1f} min\n")
             self.results_text.insert(tk.END, f"By: {algo_names}\n")
             self.results_text.insert(tk.END, "─" * 40 + "\n")
