@@ -24,28 +24,24 @@ def runEvaluation():
         print("No saved models found. Run real_traffic_models.py first to train.")
         return
 
-    xTestLstm = data['X_test_lstm']
-    xTestXgb  = data['X_test_xgb']
-    yTest     = data['y_test']
+    yTest      = data['y_test']
+    testScats  = data['test_scats']
+    testHours  = data['test_hours']
+    testDays   = data['test_days']
 
     results = {}
-    modelConfigs = [
-        ('LSTM',    'lstm',    xTestLstm),
-        ('GRU',     'gru',     xTestLstm),
-        ('XGBoost', 'xgboost', xTestXgb),
-    ]
+    modelKeys = [('LSTM', 'lstm'), ('GRU', 'gru'), ('XGBoost', 'xgboost')]
 
     print("--- Generating predictions ---")
-    for displayName, modelKey, xTest in modelConfigs:
+    for displayName, modelKey in modelKeys:
         if modelKey not in predictor.models:
             print(f"  {displayName}: model not found, skipping")
             continue
 
-        model = predictor.models[modelKey]
-        if modelKey in ['lstm', 'gru']:
-            yPred = model.predict(xTest, verbose=0).flatten()
-        else:
-            yPred = model.predict(xTest)
+        yPred = np.array([
+            predictor.predict(modelKey, testScats[i], testHours[i], testDays[i])
+            for i in range(len(yTest))
+        ], dtype=np.float32)
 
         mae  = mean_absolute_error(yTest, yPred)
         rmse = np.sqrt(mean_squared_error(yTest, yPred))

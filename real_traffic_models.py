@@ -29,7 +29,7 @@ class RealTrafficPredictor:
         self.models = {}
         self.scaler = StandardScaler()
         self.trainingHistory = {}
-        self.siteHourAvgSeq = {}
+        self.siteHourTestSeq = {}
 
     # read the SCATS Excel file, flatten it into sequences and split train/test
     def loadData(self, excelFile='Scats Data October 2006.xls'):
@@ -43,8 +43,10 @@ class RealTrafficPredictor:
         volCols = sorted(volCols, key=lambda x: int(x[1:]))
         print(f"Found {len(volCols)} volume columns (15-min intervals)")
 
-        # --- Build per-site per-hour average sequence lookup ---
-        siteHourSeqs = {}  # (scatsNum_str, dayOfWeek, hour) -> list of 12-reading sequences
+        # --- Build per-site per-hour test sequence lookup (Oct 25-31 only) ---
+        # For each (site, dayOfWeek, hour), store the actual 12-reading sequence
+        # from the test week — the 3 hours of 15-min intervals leading into that hour
+        self.siteHourTestSeq = {}
 
         for idx, row in df.iterrows():
             scatsNum = row.get('SCATS Number')
@@ -60,33 +62,24 @@ class RealTrafficPredictor:
                 volumes.append(int(vol))
 
             dateVal = row.get('Date', None)
-            if pd.notna(dateVal):
-                baseTime = pd.to_datetime(dateVal)
-            else:
-                baseTime = None
+            if pd.isna(dateVal):
+                continue
+            baseTime = pd.to_datetime(dateVal)
+            if baseTime.day < 25:
+                continue  # only use test week (Oct 25-31)
 
-            # For each hour h, collect the 12 intervals leading into it
+            dow = baseTime.dayofweek
             for h in range(24):
-                startInterval = 4 * h - 12
+                startInterval = 4 * h - self.seqLen
                 if startInterval < 0:
-                    seq = [0] * (-startInterval) + volumes[max(0, startInterval):4 * h]
+                    seq = [0] * (-startInterval) + volumes[0:4 * h]
                 else:
                     seq = volumes[startInterval:4 * h]
-                # pad to exactly 12 if needed
-                if len(seq) < 12:
-                    seq = [0] * (12 - len(seq)) + seq
-                dow = baseTime.dayofweek if baseTime is not None else 0
-                key = (scatsStr, dow, h)
-                if key not in siteHourSeqs:
-                    siteHourSeqs[key] = []
-                siteHourSeqs[key].append(seq)
+                if len(seq) < self.seqLen:
+                    seq = [0] * (self.seqLen - len(seq)) + seq
+                self.siteHourTestSeq[(scatsStr, dow, h)] = np.array(seq, dtype=np.float32)
 
-        # Average across days for each (site, dayOfWeek, hour)
-        self.siteHourAvgSeq = {}
-        for key, seqList in siteHourSeqs.items():
-            self.siteHourAvgSeq[key] = np.mean(seqList, axis=0)
-
-        print(f"Built siteHourAvgSeq for {len(self.siteHourAvgSeq)} (site, dayOfWeek, hour) pairs")
+        print(f"Built siteHourTestSeq for {len(self.siteHourTestSeq)} (site, dayOfWeek, hour) pairs")
 
         # --- Flatten all rows for model training ---
         allVolumes = []
@@ -150,6 +143,7 @@ class RealTrafficPredictor:
         timeTest = timeFeatures[splitIdx:]
         testScats = seqScats[splitIdx:]
         testHours = hours[self.seqLen:-1][splitIdx:]
+        testDays  = dayOfWeek[self.seqLen:-1][splitIdx:]
 
         # normalize flow values
         xTrainFlat = xTrainSeq.reshape(-1, self.seqLen)
@@ -178,6 +172,7 @@ class RealTrafficPredictor:
             'y_train': yTrain,
             'y_test': yTest,
             'test_scats': testScats,
+            'test_days': testDays,
             'test_hours': testHours,
         }
 
@@ -353,7 +348,7 @@ class RealTrafficPredictor:
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
         model = self.models[modelName]
 
-        lastSeq = self.siteHourAvgSeq[(str(scatsNum), dayOfWeek, hourOfDay)]
+        lastSeq = self.siteHourTestSeq[(str(scatsNum), dayOfWeek, hourOfDay)]
         lastSeq = list(lastSeq)
 
         # pad or trim sequence to the right length
@@ -395,9 +390,8 @@ class RealTrafficPredictor:
         joblib.dump(self.scaler, f'{folder}/scaler.joblib')
         print(f"Scaler saved to {folder}/scaler.joblib")
 
-        joblib.dump(self.siteHourAvgSeq, f'{folder}/site_hour_avg_seq.joblib')
-
-        print(f"Average sequence lookups saved to {folder}/")
+        joblib.dump(self.siteHourTestSeq, f'{folder}/site_hour_test_seq.joblib')
+        print(f"Test sequence lookup saved to {folder}/")
 
     # load previously saved models and scaler from disk, returns False if nothing found
     def loadModels(self, folder='saved_models'):
@@ -435,9 +429,9 @@ class RealTrafficPredictor:
             self.scaler = joblib.load(scalerPath)
             print(f"Scaler loaded from {scalerPath}")
 
-        avgPath = f'{folder}/site_hour_avg_seq.joblib'
-        if os.path.exists(avgPath):
-            self.siteHourAvgSeq = joblib.load(avgPath)
+        testSeqPath = f'{folder}/site_hour_test_seq.joblib'
+        if os.path.exists(testSeqPath):
+            self.siteHourTestSeq = joblib.load(testSeqPath)
 
         return loaded
 
