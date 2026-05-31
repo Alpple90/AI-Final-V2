@@ -372,6 +372,33 @@ class RealTrafficPredictor:
         return max(5, int(predVolume))
 
     # write all trained models and the scaler to disk
+    # build the test sequence lookup from the Excel file without full training data prep
+    def buildTestSeqLookup(self, excelFile='Scats Data October 2006.xls'):
+        print("--- Building test sequence lookup from Excel ---")
+        df = pd.read_excel(excelFile, sheet_name='Data', header=1)
+        volCols = sorted(
+            [col for col in df.columns if str(col).startswith('V') and str(col)[1:].isdigit()],
+            key=lambda x: int(x[1:])
+        )
+        self.siteHourTestSeq = {}
+        for _, row in df.iterrows():
+            scatsNum = row.get('SCATS Number')
+            dateVal  = row.get('Date', None)
+            if pd.isna(scatsNum) or pd.isna(dateVal):
+                continue
+            baseTime = pd.to_datetime(dateVal)
+            if baseTime.day < 25:
+                continue
+            scatsStr = str(int(scatsNum))
+            volumes = [int(row.get(col, 0) or 0) for col in volCols]
+            dow = baseTime.dayofweek
+            for h in range(24):
+                start = 4 * h - self.seqLen
+                seq = ([0] * max(0, -start) + volumes[max(0, start):4 * h])[-self.seqLen:]
+                seq = [0] * (self.seqLen - len(seq)) + seq
+                self.siteHourTestSeq[(scatsStr, dow, h)] = np.array(seq, dtype=np.float32)
+        print(f"Built siteHourTestSeq for {len(self.siteHourTestSeq)} (site, dayOfWeek, hour) pairs")
+
     def saveModels(self, folder='saved_models'):
         os.makedirs(folder, exist_ok=True)
 
@@ -432,6 +459,10 @@ class RealTrafficPredictor:
         testSeqPath = f'{folder}/site_hour_test_seq.joblib'
         if os.path.exists(testSeqPath):
             self.siteHourTestSeq = joblib.load(testSeqPath)
+        else:
+            self.buildTestSeqLookup()
+            joblib.dump(self.siteHourTestSeq, testSeqPath)
+            print(f"Test sequence lookup built and saved to {testSeqPath}")
 
         return loaded
 
