@@ -373,9 +373,6 @@ class TBRGSGUI:
         algorithms = ['astar', 'bidirectional', 'dijkstra', 'greedy', 'bfs', 'dfs']
         algoNames = ['A*', 'Bidir A*', 'Dijkstra', 'Greedy', 'BFS', 'DFS']
 
-        bestTime = float('inf')
-        bestAlgo = None
-
         for algo, name in zip(algorithms, algoNames):
             self.pathfinder.setAlgorithm(algo)
             self.pathfinder.setModel(modelName)
@@ -383,15 +380,9 @@ class TBRGSGUI:
 
             if path:
                 self.resultsText.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")
-                if cost < bestTime:
-                    bestTime = cost
-                    bestAlgo = name
             else:
                 self.resultsText.insert(tk.END, f"{name:<16} {'N/A':<8} {nodes:<7} N\n")
 
         self.resultsText.insert(tk.END, "-" * 40 + "\n")
-        if bestAlgo:
-            self.resultsText.insert(tk.END, f"\nBest: {bestAlgo} ({bestTime:.1f} min)\n")
-
         self.resultsText.insert(tk.END, "\n" + SEP + "\n")
-        self.statusVar.set(f"Comparison complete. Best: {bestAlgo} ({bestTime:.1f} min)")
+        self.statusVar.set("Comparison complete.")
