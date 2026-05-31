@@ -113,7 +113,7 @@ class SCATSMapViewer:
                     continue
                 try:
                     self.markers[nodeStr].delete()
-                except:
+                except Exception:
                     pass
                 lat, lng = self.coords[nodeStr]
                 m = self.mapWidget.set_marker(

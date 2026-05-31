@@ -1,6 +1,8 @@
+# map.py - node connections, colours, coordinate loading and edge drawing
 import tkinter as tk
 import tkintermapview
 import pandas as pd
+from config import MAP_TILE_SERVER, MAP_ZOOM_LEVEL
 
 TRUE_FILE = "scatsTrueLongLat.xlsx"
  
@@ -86,9 +88,9 @@ def drawEdges(mapWidget, coords):
             if key in drawn:
                 continue
             drawn.add(key)
-            la, lo = coords[a]
-            lb, lo2 = coords[b]
-            p = mapWidget.set_path([(la, lo), (lb, lo2)], color='#888888', width=2)
+            latA, lngA = coords[a]
+            latB, lngB = coords[b]
+            p = mapWidget.set_path([(latA, lngA), (latB, lngB)], color='#888888', width=2)
             paths.append(p)
     return paths
 
@@ -103,13 +105,11 @@ if __name__ == '__main__':
 
     mapWidget = tkintermapview.TkinterMapView(root, corner_radius=0)
     mapWidget.pack(fill='both', expand=True)
-    mapWidget.set_tile_server(
-        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
-    )
+    mapWidget.set_tile_server(MAP_TILE_SERVER)
     lats = [c[0] for c in coords.values()]
     lngs = [c[1] for c in coords.values()]
     mapWidget.set_position(sum(lats) / len(lats), sum(lngs) / len(lngs))
-    mapWidget.set_zoom(13)
+    mapWidget.set_zoom(MAP_ZOOM_LEVEL)
 
     drawEdges(mapWidget, coords)
 

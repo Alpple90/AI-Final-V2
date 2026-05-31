@@ -34,10 +34,12 @@ class MockPredictor:
         return 100
 
 
+# build a small 5-node graph from the mock data
 def makeMockGraph():
     return buildGraph(MOCK_CONNECTIONS, MOCK_COORDS)
 
 
+# build a PathFinder using the mock graph and a fixed-flow predictor
 def makePathFinder():
     graph = makeMockGraph()
     pf = PathFinder(graph, MockPredictor(), MOCK_COORDS)
