@@ -30,6 +30,7 @@ class RealTrafficPredictor:
         self.scaler = StandardScaler()
         self.trainingHistory = {}
         self.siteHourTestSeq = {}
+        self.predictionCache = {}
 
     # read the SCATS Excel file, flatten it into sequences and split train/test
     def loadData(self, excelFile='Scats Data October 2006.xls'):
@@ -344,32 +345,51 @@ class RealTrafficPredictor:
         if importance.shape[0] > self.seqLen + 1:
             print(f"  Day of week:            {importance[self.seqLen + 1]:.3f}")
 
-    # run the chosen model on the given traffic sequence and return a flow prediction
+    # precompute predictions for every (model, site, dayOfWeek, hour) and save to disk
+    def precomputePredictions(self, folder='saved_models'):
+        print("--- Precomputing predictions for all models, sites, days and hours ---")
+        self.predictionCache = {}
+        sites = list({k[0] for k in self.siteHourTestSeq})
+
+        for modelName, model in self.models.items():
+            print(f"  {modelName}...")
+            for scatsStr in sites:
+                for dow in range(7):
+                    seqs, keys = [], []
+                    for h in range(24):
+                        key = (scatsStr, dow, h)
+                        if key not in self.siteHourTestSeq:
+                            continue
+                        lastSeq = list(self.siteHourTestSeq[key])
+                        seqs.append(lastSeq)
+                        keys.append((modelName, scatsStr, dow, h))
+
+                    if not seqs:
+                        continue
+
+                    seqArray = np.array(seqs, dtype=np.float32)
+                    seqNorm = self.scaler.transform(seqArray)
+
+                    if modelName in ['lstm', 'gru']:
+                        seqInput = seqNorm.reshape(len(seqs), self.seqLen, 1)
+                        predsNorm = model.predict(seqInput, verbose=0).flatten()
+                        preds = predsNorm * self.scaler.scale_[0] + self.scaler.mean_[0]
+                    else:
+                        hours = np.array([[k[3]] for k in keys])
+                        dows  = np.array([[k[2]] for k in keys])
+                        features = np.column_stack([seqNorm, hours, dows])
+                        preds = model.predict(features)
+
+                    for key, pred in zip(keys, preds):
+                        self.predictionCache[key] = max(5, int(pred))
+
+        os.makedirs(folder, exist_ok=True)
+        joblib.dump(self.predictionCache, f'{folder}/prediction_cache.joblib')
+        print(f"  Saved {len(self.predictionCache)} predictions to {folder}/prediction_cache.joblib")
+
+    # look up a precomputed prediction — (model, site, dayOfWeek, hour)
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
-        model = self.models[modelName]
-
-        lastSeq = self.siteHourTestSeq[(str(scatsNum), dayOfWeek, hourOfDay)]
-        lastSeq = list(lastSeq)
-
-        # pad or trim sequence to the right length
-        if len(lastSeq) < self.seqLen:
-            lastSeq = [lastSeq[-1]] * (self.seqLen - len(lastSeq)) + lastSeq
-        elif len(lastSeq) > self.seqLen:
-            lastSeq = lastSeq[-self.seqLen:]
-
-        seqArray = np.array(lastSeq[-self.seqLen:]).reshape(1, -1)
-        seqNorm = self.scaler.transform(seqArray)
-
-        if modelName in ['lstm', 'gru']:
-            seqInput = seqNorm.reshape(1, self.seqLen, 1)
-            predNorm = model.predict(seqInput, verbose=0)[0, 0]
-            predVolume = predNorm * self.scaler.scale_[0] + self.scaler.mean_[0]
-        else:  # xgboost
-            timeFeatures = np.array([[hourOfDay, dayOfWeek]])
-            features = np.column_stack([seqNorm, timeFeatures])
-            predVolume = model.predict(features)[0]
-
-        return max(5, int(predVolume))
+        return self.predictionCache[(modelName, str(scatsNum), dayOfWeek, hourOfDay)]
 
     # write all trained models and the scaler to disk
     # build the test sequence lookup from the Excel file without full training data prep
@@ -420,6 +440,8 @@ class RealTrafficPredictor:
         joblib.dump(self.siteHourTestSeq, f'{folder}/site_hour_test_seq.joblib')
         print(f"Test sequence lookup saved to {folder}/")
 
+        self.precomputePredictions(folder)
+
     # load previously saved models and scaler from disk, returns False if nothing found
     def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
@@ -463,6 +485,13 @@ class RealTrafficPredictor:
             self.buildTestSeqLookup()
             joblib.dump(self.siteHourTestSeq, testSeqPath)
             print(f"Test sequence lookup built and saved to {testSeqPath}")
+
+        cachePath = f'{folder}/prediction_cache.joblib'
+        if os.path.exists(cachePath):
+            self.predictionCache = joblib.load(cachePath)
+            print(f"Prediction cache loaded from {cachePath}")
+        else:
+            self.precomputePredictions(folder)
 
         return loaded
 
