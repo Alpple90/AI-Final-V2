@@ -30,7 +30,6 @@ class RealTrafficPredictor:
         self.scaler = StandardScaler()
         self.trainingHistory = {}
         self.siteHourAvgSeq = {}
-        self.globalHourAvgSeq = {}
 
     # read the SCATS Excel file, flatten it into sequences and split train/test
     def loadData(self, excelFile='Scats Data October 2006.xls'):
@@ -79,16 +78,6 @@ class RealTrafficPredictor:
         self.siteHourAvgSeq = {}
         for key, seqList in siteHourSeqs.items():
             self.siteHourAvgSeq[key] = np.mean(seqList, axis=0)
-
-        # Global fallback: average across all sites per hour
-        hourSeqs = {}  # hour -> list of sequences
-        for (scatsStr, h), seqList in siteHourSeqs.items():
-            if h not in hourSeqs:
-                hourSeqs[h] = []
-            hourSeqs[h].extend(seqList)
-        self.globalHourAvgSeq = {}
-        for h, seqList in hourSeqs.items():
-            self.globalHourAvgSeq[h] = np.mean(seqList, axis=0)
 
         print(f"Built siteHourAvgSeq for {len(self.siteHourAvgSeq)} (site, hour) pairs")
 
@@ -344,9 +333,7 @@ class RealTrafficPredictor:
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
         model = self.models[modelName]
 
-        lastSeq = self.siteHourAvgSeq.get((str(scatsNum), hourOfDay),
-                  self.globalHourAvgSeq.get(hourOfDay,
-                  [50] * self.seqLen))
+        lastSeq = self.siteHourAvgSeq[(str(scatsNum), hourOfDay)]
         lastSeq = list(lastSeq)
 
         # pad or trim sequence to the right length
@@ -389,7 +376,7 @@ class RealTrafficPredictor:
         print(f"Scaler saved to {folder}/scaler.joblib")
 
         joblib.dump(self.siteHourAvgSeq, f'{folder}/site_hour_avg_seq.joblib')
-        joblib.dump(self.globalHourAvgSeq, f'{folder}/global_hour_avg_seq.joblib')
+
         print(f"Average sequence lookups saved to {folder}/")
 
     # load previously saved models and scaler from disk, returns False if nothing found
@@ -431,9 +418,6 @@ class RealTrafficPredictor:
         avgPath = f'{folder}/site_hour_avg_seq.joblib'
         if os.path.exists(avgPath):
             self.siteHourAvgSeq = joblib.load(avgPath)
-        globalAvgPath = f'{folder}/global_hour_avg_seq.joblib'
-        if os.path.exists(globalAvgPath):
-            self.globalHourAvgSeq = joblib.load(globalAvgPath)
 
         return loaded
 
