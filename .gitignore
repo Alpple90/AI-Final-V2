@@ -13,3 +13,6 @@ data_test_reference.csv
 
 # Generated report output
 model_comparison.png
+
+# Claude Code internal files
+.claude/
