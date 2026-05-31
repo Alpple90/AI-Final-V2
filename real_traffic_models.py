@@ -450,12 +450,12 @@ class RealTrafficPredictor:
         os.makedirs(folder, exist_ok=True)
 
         if 'lstm' in self.models:
-            self.models['lstm'].save(f'{folder}/lstm_model.keras', save_format='keras')
-            print(f"LSTM model saved to {folder}/lstm_model.keras")
+            self.models['lstm'].save(f'{folder}/lstm_model.h5')
+            print(f"LSTM model saved to {folder}/lstm_model.h5")
 
         if 'gru' in self.models:
-            self.models['gru'].save(f'{folder}/gru_model.keras', save_format='keras')
-            print(f"GRU model saved to {folder}/gru_model.keras")
+            self.models['gru'].save(f'{folder}/gru_model.h5')
+            print(f"GRU model saved to {folder}/gru_model.h5")
 
         if 'xgboost' in self.models:
             joblib.dump(self.models['xgboost'], f'{folder}/xgboost_model.joblib')
@@ -476,14 +476,18 @@ class RealTrafficPredictor:
 
         loaded = False
 
-        lstmPath = f'{folder}/lstm_model.keras'
+        lstmPath = f'{folder}/lstm_model.h5'
+        if not os.path.exists(lstmPath):
+            lstmPath = f'{folder}/lstm_model.keras'
         if os.path.exists(lstmPath):
             self.models['lstm'] = load_model(lstmPath, compile=False)
             self.models['lstm'].compile(loss='mse', optimizer='adam', metrics=['mape'])
             print(f"LSTM model loaded from {lstmPath}")
             loaded = True
 
-        gruPath = f'{folder}/gru_model.keras'
+        gruPath = f'{folder}/gru_model.h5'
+        if not os.path.exists(gruPath):
+            gruPath = f'{folder}/gru_model.keras'
         if os.path.exists(gruPath):
             self.models['gru'] = load_model(gruPath, compile=False)
             self.models['gru'].compile(loss='mse', optimizer='adam', metrics=['mape'])
