@@ -450,11 +450,11 @@ class RealTrafficPredictor:
         os.makedirs(folder, exist_ok=True)
 
         if 'lstm' in self.models:
-            self.models['lstm'].save(f'{folder}/lstm_model.keras')
+            self.models['lstm'].save(f'{folder}/lstm_model.keras', save_format='keras')
             print(f"LSTM model saved to {folder}/lstm_model.keras")
 
         if 'gru' in self.models:
-            self.models['gru'].save(f'{folder}/gru_model.keras')
+            self.models['gru'].save(f'{folder}/gru_model.keras', save_format='keras')
             print(f"GRU model saved to {folder}/gru_model.keras")
 
         if 'xgboost' in self.models:
@@ -468,15 +468,6 @@ class RealTrafficPredictor:
 
         self.precomputePredictions(folder)
 
-    # load a .keras file tolerantly, stripping unknown keys like quantization_config
-    def _loadKerasModel(self, path):
-        class _PatchedDense(Dense):
-            @classmethod
-            def from_config(cls, config):
-                config.pop('quantization_config', None)
-                return super().from_config(config)
-        return load_model(path, custom_objects={'Dense': _PatchedDense}, compile=False)
-
     # load saved models, scalers and prediction cache from disk
     def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
@@ -487,14 +478,14 @@ class RealTrafficPredictor:
 
         lstmPath = f'{folder}/lstm_model.keras'
         if os.path.exists(lstmPath):
-            self.models['lstm'] = self._loadKerasModel(lstmPath)
+            self.models['lstm'] = load_model(lstmPath, compile=False)
             self.models['lstm'].compile(loss='mse', optimizer='adam', metrics=['mape'])
             print(f"LSTM model loaded from {lstmPath}")
             loaded = True
 
         gruPath = f'{folder}/gru_model.keras'
         if os.path.exists(gruPath):
-            self.models['gru'] = self._loadKerasModel(gruPath)
+            self.models['gru'] = load_model(gruPath, compile=False)
             self.models['gru'].compile(loss='mse', optimizer='adam', metrics=['mape'])
             print(f"GRU model loaded from {gruPath}")
             loaded = True
