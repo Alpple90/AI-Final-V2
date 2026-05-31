@@ -42,6 +42,7 @@ class RealTrafficPredictor:
     # Parse logic
     # -------------------------------------------------------------------------
 
+    # load and preprocess Excel data, fit scalers, return train/test windows
     def loadData(self, excelFile='TrafficDataCopy.xlsx'):
         print("--- Loading traffic data from Excel (Parse logic) ---")
 
@@ -85,8 +86,8 @@ class RealTrafficPredictor:
         self.scaler.fit(trainFlows)
 
         # Build windows for train and test sets
-        xTrain, yTrain = self._buildWindows(trainDf, timeCols, fit=False)
-        xTest,  yTest  = self._buildWindows(testDf,  timeCols, fit=False)
+        xTrain, yTrain = self.buildWindows(trainDf, timeCols, fit=False)
+        xTest,  yTest  = self.buildWindows(testDf,  timeCols, fit=False)
 
         # Shuffle training windows
         idx = np.random.permutation(len(xTrain))
@@ -94,8 +95,8 @@ class RealTrafficPredictor:
         yTrain = yTrain[idx]
 
         # Save reference CSVs (needed by buildReference / precomputePredictions)
-        self._saveReference(trainDf, timeCols, 'data_train_reference.csv')
-        self._saveReference(testDf,  timeCols, 'data_test_reference.csv')
+        self.saveReference(trainDf, timeCols, 'data_train_reference.csv')
+        self.saveReference(testDf,  timeCols, 'data_test_reference.csv')
 
         print(f"Training windows: {len(xTrain)}, Test windows: {len(xTest)}")
         print(f"Window shape: {xTrain.shape}")  # (N, 12, 6)
@@ -113,8 +114,8 @@ class RealTrafficPredictor:
             'y_test':  yTest,
         }
 
-    def _meltToLong(self, df, timeCols):
-        """Melt a grouped df to long format with Time and Flow columns."""
+    # melt grouped df from wide to long format with Time and Flow columns
+    def meltToLong(self, df, timeCols):
         melted = df.melt(
             id_vars=['SCATS Number', 'Date', 'Day of week'],
             value_vars=timeCols,
@@ -128,8 +129,8 @@ class RealTrafficPredictor:
         melted = melted.sort_values(['SCATS Number', 'Date', 'Time']).reset_index(drop=True)
         return melted
 
-    def _addCyclicalFeatures(self, melted):
-        """Add sin/cos encoding for Day of week (period 7) and Time slot (period 96)."""
+    # add sin/cos encoding for day of week and time slot index
+    def addCyclicalFeatures(self, melted):
         # Time slot index 0-95
         melted['_timeIdx'] = melted['Time'].apply(
             lambda t: t.hour * 4 + t.minute // 15
@@ -143,10 +144,10 @@ class RealTrafficPredictor:
         melted['time_cos'] = np.cos(2 * np.pi * tidx / 96)
         return melted
 
-    def _buildWindows(self, df, timeCols, fit=False):
-        """Build sliding windows of shape (seqLen, 6) per site."""
-        melted = self._meltToLong(df, timeCols)
-        melted = self._addCyclicalFeatures(melted)
+    # build sliding windows of shape (seqLen, 6) per site
+    def buildWindows(self, df, timeCols, fit=False):
+        melted = self.meltToLong(df, timeCols)
+        melted = self.addCyclicalFeatures(melted)
 
         # Normalize scats numbers and flow
         scatsNorm = self.scatsScaler.transform(
@@ -173,18 +174,18 @@ class RealTrafficPredictor:
 
         return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
-    def _saveReference(self, df, timeCols, filename):
-        """Melt df to long and save to CSV for GetFlow reference."""
-        melted = self._meltToLong(df, timeCols)
-        melted = self._addCyclicalFeatures(melted)
+    # melt df to long format and save as CSV for precompute reference
+    def saveReference(self, df, timeCols, filename):
+        melted = self.meltToLong(df, timeCols)
+        melted = self.addCyclicalFeatures(melted)
         melted.to_csv(filename, index=False)
 
     # -------------------------------------------------------------------------
     # Model builders (Model.py logic)
     # -------------------------------------------------------------------------
 
-    def _buildSequentialModel(self, layerType):
-        """Build 2-layer LSTM or GRU with Dropout, sigmoid output."""
+    # build 2-layer LSTM or GRU with dropout and sigmoid output
+    def buildSequentialModel(self, layerType):
         LayerCls = LSTM if layerType == 'lstm' else GRU
         model = Sequential()
         model.add(LayerCls(64, input_shape=(self.seqLen, 6), return_sequences=True))
@@ -198,12 +199,13 @@ class RealTrafficPredictor:
     # Train logic
     # -------------------------------------------------------------------------
 
-    def _trainDeepModel(self, modelName, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
+    # compile, train and evaluate a deep model with early stopping
+    def trainDeepModel(self, modelName, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
         if verbose:
             print(f"--- Training {modelName.upper()} model ---")
             print(f"Training samples: {len(xTrain)}, Validation samples: {len(xTest)}")
 
-        model = self._buildSequentialModel(modelName)
+        model = self.buildSequentialModel(modelName)
         model.compile(loss='mse', optimizer='adam', metrics=['mape'])
 
         early = EarlyStopping(
@@ -240,11 +242,13 @@ class RealTrafficPredictor:
         return model
 
     def trainLSTM(self, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
-        return self._trainDeepModel('lstm', xTrain, yTrain, xTest, yTest, epochs, verbose)
+        return self.trainDeepModel('lstm', xTrain, yTrain, xTest, yTest, epochs, verbose)
 
+    # train the GRU model
     def trainGRU(self, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
-        return self._trainDeepModel('gru', xTrain, yTrain, xTest, yTest, epochs, verbose)
+        return self.trainDeepModel('gru', xTrain, yTrain, xTest, yTest, epochs, verbose)
 
+    # train the XGBoost model on flattened sequence windows
     def trainXGB(self, xTrainFlat, yTrain, xTestFlat, yTest, verbose=True):
         if verbose:
             print("--- Training XGBoost model ---")
@@ -278,8 +282,8 @@ class RealTrafficPredictor:
     # GetFlow logic
     # -------------------------------------------------------------------------
 
-    def _buildReference(self):
-        """Read data_test_reference.csv and return per-site meta rows (GetFlow buildReference logic)."""
+    # read test reference CSV and return per-site meta rows
+    def buildReference(self):
         ref = pd.read_csv('data_test_reference.csv')
         sites = ref['SCATS Number'].unique()
 
@@ -296,8 +300,8 @@ class RealTrafficPredictor:
 
         return pd.DataFrame(reference).reset_index(drop=True)
 
-    def _buildTestWindows(self, refDf):
-        """Rebuild x_test windows from the reference CSV (same order as _buildReference)."""
+    # rebuild x_test windows from the reference CSV
+    def buildTestWindows(self, refDf):
         featureCols = ['_scats_norm', '_flow_norm', 'day_sin', 'day_cos', 'time_sin', 'time_cos']
 
         fullRef = pd.read_csv('data_test_reference.csv')
@@ -340,12 +344,12 @@ class RealTrafficPredictor:
 
         return np.array(xWindows, dtype=np.float32), pd.DataFrame(meta)
 
+    # run all models over x_test once and cache results by (model, site, day, hour)
     def precomputePredictions(self, folder='saved_models'):
-        """Run model.predict on full x_test once, cache results (GetFlow precompute logic)."""
         print("--- Precomputing predictions for all models ---")
         os.makedirs(folder, exist_ok=True)
 
-        xTest, metaDf = self._buildTestWindows(None)
+        xTest, metaDf = self.buildTestWindows(None)
 
         cacheCounts = {}
         for modelName, model in self.models.items():
@@ -389,8 +393,8 @@ class RealTrafficPredictor:
     # Predict
     # -------------------------------------------------------------------------
 
+    # look up a precomputed prediction from the cache
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
-        """Look up precomputed prediction. Key: (modelName, scatsNum_int, dow_int, hour_int)."""
         scatsInt = int(scatsNum) if not isinstance(scatsNum, int) else scatsNum
         key = (modelName, scatsInt, dayOfWeek, hourOfDay)
         if key in self.predictionCache:
@@ -407,6 +411,7 @@ class RealTrafficPredictor:
     # Eval
     # -------------------------------------------------------------------------
 
+    # compute and print MAE, RMSE and R2 for a model on a test set
     def evalModel(self, name, model, xTest, yTest):
         if name in ('lstm', 'gru'):
             yPred = model.predict(xTest, verbose=0).flatten()
@@ -440,6 +445,7 @@ class RealTrafficPredictor:
     # Save / Load
     # -------------------------------------------------------------------------
 
+    # save all trained models and scalers to disk
     def saveModels(self, folder='saved_models'):
         os.makedirs(folder, exist_ok=True)
 
@@ -462,6 +468,7 @@ class RealTrafficPredictor:
 
         self.precomputePredictions(folder)
 
+    # load saved models, scalers and prediction cache from disk
     def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
             print(f"Folder {folder} not found. Will train new models.")

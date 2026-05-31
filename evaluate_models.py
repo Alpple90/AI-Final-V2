@@ -44,7 +44,7 @@ def runEvaluation():
     # Rebuild test windows to get meta (site, day, hour) for each sample
     if os.path.exists('data_test_reference.csv'):
         refDf = pd.read_csv('data_test_reference.csv')
-        _, metaDf = predictor._buildTestWindows(refDf)
+        _, metaDf = predictor.buildTestWindows(refDf)
         testScats = metaDf['SCATS Number'].tolist()
         testDays  = metaDf['Day of week'].tolist()
         testHours = [int(str(t)[:2]) for t in metaDf['Time'].tolist()]

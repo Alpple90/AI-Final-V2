@@ -35,6 +35,7 @@ class PathFinder:
             return True
         return False
 
+    # get predicted travel time for one directed edge
     def getEdgeCost(self, fromNode, toNode, distance, hour, dayOfWeek=2):
         predictedFlow = self.traffic_predictor.predict(self.currentModel, toNode, hour, dayOfWeek)
         return calcTravelTime(distance, predictedFlow)
@@ -53,6 +54,7 @@ class PathFinder:
                     break
         return round(totalTime, 2)
 
+    # straight-line haversine distance estimate between two graph nodes
     def heuristic(self, node, goal):
         if not self.coords or node not in self.coords or goal not in self.coords:
             return 0
