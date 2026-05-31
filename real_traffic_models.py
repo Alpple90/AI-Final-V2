@@ -44,7 +44,7 @@ class RealTrafficPredictor:
         print(f"Found {len(volCols)} volume columns (15-min intervals)")
 
         # --- Build per-site per-hour average sequence lookup ---
-        siteHourSeqs = {}  # (scatsNum_str, hour) -> list of 12-reading sequences
+        siteHourSeqs = {}  # (scatsNum_str, dayOfWeek, hour) -> list of 12-reading sequences
 
         for idx, row in df.iterrows():
             scatsNum = row.get('SCATS Number')
@@ -59,6 +59,12 @@ class RealTrafficPredictor:
                     vol = 0
                 volumes.append(int(vol))
 
+            dateVal = row.get('Date', None)
+            if pd.notna(dateVal):
+                baseTime = pd.to_datetime(dateVal)
+            else:
+                baseTime = None
+
             # For each hour h, collect the 12 intervals leading into it
             for h in range(24):
                 startInterval = 4 * h - 12
@@ -69,21 +75,23 @@ class RealTrafficPredictor:
                 # pad to exactly 12 if needed
                 if len(seq) < 12:
                     seq = [0] * (12 - len(seq)) + seq
-                key = (scatsStr, h)
+                dow = baseTime.dayofweek if baseTime is not None else 0
+                key = (scatsStr, dow, h)
                 if key not in siteHourSeqs:
                     siteHourSeqs[key] = []
                 siteHourSeqs[key].append(seq)
 
-        # Average across days for each (site, hour)
+        # Average across days for each (site, dayOfWeek, hour)
         self.siteHourAvgSeq = {}
         for key, seqList in siteHourSeqs.items():
             self.siteHourAvgSeq[key] = np.mean(seqList, axis=0)
 
-        print(f"Built siteHourAvgSeq for {len(self.siteHourAvgSeq)} (site, hour) pairs")
+        print(f"Built siteHourAvgSeq for {len(self.siteHourAvgSeq)} (site, dayOfWeek, hour) pairs")
 
         # --- Flatten all rows for model training ---
         allVolumes = []
         timestamps = []
+        allScats = []
 
         for idx, row in df.iterrows():
             scatsNum = row.get('SCATS Number')
@@ -100,6 +108,8 @@ class RealTrafficPredictor:
             dateVal = row.get('Date', None)
             if pd.notna(dateVal):
                 allVolumes.extend(volumes)
+                scatsStr = str(scatsNum).lstrip('0').strip() or '0'
+                allScats.extend([scatsStr] * len(volumes))
                 baseTime = pd.to_datetime(dateVal)
                 for i in range(len(volumes)):
                     timestamps.append(baseTime + timedelta(minutes=15 * i))
@@ -110,10 +120,11 @@ class RealTrafficPredictor:
         dayOfWeek = [ts.dayofweek for ts in timestamps]
 
         # build sliding window sequences
-        X, y = [], []
+        X, y, seqScats = [], [], []
         for i in range(len(allVolumes) - self.seqLen - 1):
             X.append(allVolumes[i:i + self.seqLen])
             y.append(allVolumes[i + self.seqLen])
+            seqScats.append(allScats[i + self.seqLen])
 
         X = np.array(X, dtype=np.float32)
         y = np.array(y, dtype=np.float32)
@@ -132,6 +143,8 @@ class RealTrafficPredictor:
         yTest = y[splitIdx:]
         timeTrain = timeFeatures[:splitIdx]
         timeTest = timeFeatures[splitIdx:]
+        testScats = seqScats[splitIdx:]
+        testHours = hours[self.seqLen:-1][splitIdx:]
 
         # normalize flow values
         xTrainFlat = xTrainSeq.reshape(-1, self.seqLen)
@@ -159,6 +172,8 @@ class RealTrafficPredictor:
             'X_test_xgb': xTestXgb,
             'y_train': yTrain,
             'y_test': yTest,
+            'test_scats': testScats,
+            'test_hours': testHours,
         }
 
     # define and compile a stacked LSTM network for traffic volume prediction
@@ -333,7 +348,7 @@ class RealTrafficPredictor:
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
         model = self.models[modelName]
 
-        lastSeq = self.siteHourAvgSeq[(str(scatsNum), hourOfDay)]
+        lastSeq = self.siteHourAvgSeq[(str(scatsNum), dayOfWeek, hourOfDay)]
         lastSeq = list(lastSeq)
 
         # pad or trim sequence to the right length

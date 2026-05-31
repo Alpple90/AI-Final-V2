@@ -16,6 +16,7 @@ class TBRGSGUI:
         self.originVar = tk.StringVar()
         self.destVar = tk.StringVar()
         self.timeVar = tk.StringVar(value="12:00")
+        self.dayVar = tk.StringVar(value='Monday')
 
         self.mapWidget = None
         self.resultsText = None
@@ -86,6 +87,14 @@ class TBRGSGUI:
                 font=('Arial', 10)).grid(row=2, column=1, sticky='w', pady=5, padx=(10, 0))
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
+
+        tk.Label(inputFrame, text="Day of Week:", font=('Arial', 10),
+                bg='#f0f0f0').grid(row=3, column=0, sticky='w', pady=5)
+        dayCombo = ttk.Combobox(inputFrame, textvariable=self.dayVar, width=20,
+                                values=['Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                                        'Friday', 'Saturday', 'Sunday'], state='readonly')
+        dayCombo.grid(row=3, column=1, pady=5, padx=(10, 0))
+        dayCombo.current(0)
 
     # add radio buttons for choosing LSTM, GRU or XGBoost
     def buildModelFrame(self, parent):
@@ -248,11 +257,14 @@ class TBRGSGUI:
         except:
             hour = 12
 
-        return origin, dest, hour
+        dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        dayOfWeek = dayNames.index(self.dayVar.get())
+
+        return origin, dest, hour, dayOfWeek
 
     # kick off a route search using all 6 algorithms and show the top results
     def findRoutes(self):
-        origin, dest, hour = self.getUserInput()
+        origin, dest, hour, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -267,7 +279,7 @@ class TBRGSGUI:
 
         self.pathfinder.setModel(modelName)
 
-        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5)
+        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5, dayOfWeek=dayOfWeek)
 
         self.currentPaths = paths
         if paths:
@@ -331,7 +343,7 @@ class TBRGSGUI:
 
     # run all 6 algorithms on the same trip and print a side-by-side comparison
     def compareAlgos(self):
-        origin, dest, hour = self.getUserInput()
+        origin, dest, hour, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -361,7 +373,7 @@ class TBRGSGUI:
         for algo, name in zip(algorithms, algoNames):
             self.pathfinder.setAlgorithm(algo)
             self.pathfinder.setModel(modelName)
-            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour)
+            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour, dayOfWeek)
 
             if path:
                 self.resultsText.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")
