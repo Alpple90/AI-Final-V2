@@ -517,4 +517,23 @@ def trainAllModels():
 
 
 if __name__ == "__main__":
-    predictor = trainAllModels()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', choices=['lstm', 'gru', 'xgboost', 'all'], default='all',
+                        help='Which model to train (default: all)')
+    args = parser.parse_args()
+
+    if args.model == 'all':
+        trainAllModels()
+    else:
+        predictor = RealTrafficPredictor(seqLen=12, batchSize=256, lr=0.001)
+        data = predictor.loadData('TrafficDataCopy.xlsx')
+        predictor.loadModels()  # load existing models so others are preserved
+        if args.model == 'lstm':
+            predictor.trainLSTM(data['x_train'], data['y_train'], data['x_test'], data['y_test'], epochs=600)
+        elif args.model == 'gru':
+            predictor.trainGRU(data['x_train'], data['y_train'], data['x_test'], data['y_test'], epochs=600)
+        elif args.model == 'xgboost':
+            predictor.trainXGB(data['x_train_flat'], data['y_train'], data['x_test_flat'], data['y_test'])
+        predictor.saveModels()
+        print(f"--- {args.model.upper()} training complete ---")
