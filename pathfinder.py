@@ -13,6 +13,7 @@ class PathFinder:
         self.coords = coords or {}
         self.currentModel = 'lstm'
         self.currentAlgorithm = 'astar'
+        self._flowCache = {}
 
         self.algorithms = {
             'bfs': self.bfs,
@@ -35,9 +36,10 @@ class PathFinder:
         return False
 
     def getEdgeCost(self, fromNode, toNode, distance, hour, dayOfWeek=2):
-        # grab predicted flow for this edge, then convert to travel time
-        predictedFlow = self.traffic_predictor.predict(self.currentModel, toNode, hour, dayOfWeek)
-        return calcTravelTime(distance, predictedFlow)
+        key = (self.currentModel, toNode, hour, dayOfWeek)
+        if key not in self._flowCache:
+            self._flowCache[key] = self.traffic_predictor.predict(self.currentModel, toNode, hour, dayOfWeek)
+        return calcTravelTime(distance, self._flowCache[key])
 
     # sum up travel time across every edge in the path
     def calcPathTime(self, path, hour, dayOfWeek=2):
@@ -347,7 +349,8 @@ class PathFinder:
     def findUniquePaths(self, start, goal, hour=12, maxPaths=5, dayOfWeek=2):
         # each algorithm finds up to maxPaths routes via Yen's spur method,
         # then pool everything, deduplicate and return the top maxPaths
-        seen = {}   # path_tuple -> index in results
+        self._flowCache = {}
+        seen = {}
         results = []
 
         print(f"---Finding routes {start} -> {goal}---")
