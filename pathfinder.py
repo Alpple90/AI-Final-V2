@@ -36,12 +36,12 @@ class PathFinder:
         return False
 
     # get predicted travel time for one directed edge
-    def getEdgeCost(self, fromNode, toNode, distance, hour, dayOfWeek=2):
-        predictedFlow = self.traffic_predictor.predict(self.currentModel, toNode, hour, dayOfWeek)
+    def getEdgeCost(self, fromNode, toNode, distance, timeSlot, dayOfWeek=2):
+        predictedFlow = self.traffic_predictor.predict(self.currentModel, toNode, timeSlot, dayOfWeek)
         return calcTravelTime(distance, predictedFlow)
 
     # sum up travel time across every edge in the path
-    def calcPathTime(self, path, hour, dayOfWeek=2):
+    def calcPathTime(self, path, timeSlot, dayOfWeek=2):
         if len(path) < 2:
             return 0
         totalTime = 0
@@ -50,7 +50,7 @@ class PathFinder:
             toNode = str(path[i+1])
             for neighbor, dist in self.graph.get(fromNode, []):
                 if neighbor == toNode:
-                    totalTime += self.getEdgeCost(fromNode, toNode, dist, hour, dayOfWeek)
+                    totalTime += self.getEdgeCost(fromNode, toNode, dist, timeSlot, dayOfWeek)
                     break
         return round(totalTime, 2)
 
@@ -63,7 +63,7 @@ class PathFinder:
         return haversineDistance(lat1, lon1, lat2, lon2)
 
     # run BFS from start to goal using a parent dict to trace the path
-    def bfs(self, start, goal, hour=12, dayOfWeek=2):
+    def bfs(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -84,7 +84,7 @@ class PathFinder:
                     node = parent[node]
                 path = list(reversed(path))
                 intPath = [int(n) for n in path]
-                return intPath, self.calcPathTime(intPath, hour, dayOfWeek), nodesExplored
+                return intPath, self.calcPathTime(intPath, timeSlot, dayOfWeek), nodesExplored
             if current not in visited:
                 visited.append(current)
                 for neighbor, _ in self.graph.get(current, []):
@@ -95,7 +95,7 @@ class PathFinder:
         return None, float('inf'), nodesExplored
 
     # run DFS from start to goal using a parent dict to trace the path
-    def dfs(self, start, goal, hour=12, dayOfWeek=2):
+    def dfs(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -116,7 +116,7 @@ class PathFinder:
                     node = parent[node]
                 path = list(reversed(path))
                 intPath = [int(n) for n in path]
-                return intPath, self.calcPathTime(intPath, hour, dayOfWeek), nodesExplored
+                return intPath, self.calcPathTime(intPath, timeSlot, dayOfWeek), nodesExplored
             if current not in visited:
                 visited.append(current)
                 for neighbor, _ in self.graph.get(current, []):
@@ -128,7 +128,7 @@ class PathFinder:
         return None, float('inf'), nodesExplored
 
     # greedy best-first search, picks the node that looks closest to the goal
-    def greedy(self, start, goal, hour=12, dayOfWeek=2):
+    def greedy(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -144,7 +144,7 @@ class PathFinder:
                 continue
             visited.add(current)
             if current == goalStr:
-                totalTime = self.calcPathTime([int(n) for n in path], hour, dayOfWeek)
+                totalTime = self.calcPathTime([int(n) for n in path], timeSlot, dayOfWeek)
                 return [int(n) for n in path], totalTime, nodesExplored
             for neighbor, _ in self.graph.get(current, []):
                 if neighbor not in visited:
@@ -154,7 +154,7 @@ class PathFinder:
         return None, float('inf'), nodesExplored
 
     # A* search combining actual cost with haversine heuristic
-    def astar(self, start, goal, hour=12, dayOfWeek=2):
+    def astar(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -175,7 +175,7 @@ class PathFinder:
             for neighbor, distance in self.graph.get(current, []):
                 if neighbor in path:
                     continue
-                edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
+                edgeCost = self.getEdgeCost(current, neighbor, distance, timeSlot, dayOfWeek)
                 newCost = actualCost + edgeCost
                 h = self.heuristic(neighbor, goalStr)
                 counter += 1
@@ -183,7 +183,7 @@ class PathFinder:
         return None, float('inf'), nodesExplored
 
     # dijkstra's shortest path expanding by lowest cost so far
-    def dijkstra(self, start, goal, hour=12, dayOfWeek=2):
+    def dijkstra(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -204,14 +204,14 @@ class PathFinder:
             for neighbor, distance in self.graph.get(current, []):
                 if neighbor in path:
                     continue
-                edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
+                edgeCost = self.getEdgeCost(current, neighbor, distance, timeSlot, dayOfWeek)
                 newCost = cost + edgeCost
                 counter += 1
                 heappush(pq, (newCost, counter, neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
     # A* searching from both ends simultaneously and merging when they meet
-    def bidirectionalAstar(self, start, goal, hour=12, dayOfWeek=2):
+    def bidirectionalAstar(self, start, goal, timeSlot=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
@@ -243,7 +243,7 @@ class PathFinder:
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
-                    edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
+                    edgeCost = self.getEdgeCost(current, neighbor, distance, timeSlot, dayOfWeek)
                     newCost = cost + edgeCost
                     h = self.heuristic(neighbor, goalStr)
                     counter += 1
@@ -267,7 +267,7 @@ class PathFinder:
                 for neighbor, distance in self.graph.get(current, []):
                     if neighbor in path:
                         continue
-                    edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
+                    edgeCost = self.getEdgeCost(current, neighbor, distance, timeSlot, dayOfWeek)
                     newCost = cost + edgeCost
                     h = self.heuristic(neighbor, goalStr)
                     counter += 1
@@ -282,12 +282,12 @@ class PathFinder:
         return None, float('inf'), nodesExplored
 
     # dispatch to whichever algorithm is currently selected
-    def findPath(self, start, goal, hour=12, dayOfWeek=2):
+    def findPath(self, start, goal, timeSlot=12, dayOfWeek=2):
         algoFunc = self.algorithms.get(self.currentAlgorithm, self.astar)
-        return algoFunc(start, goal, hour, dayOfWeek)
+        return algoFunc(start, goal, timeSlot, dayOfWeek)
 
     # find the k cheapest paths using Yen's spur approach
-    def findTopKPaths(self, start, goal, k=DEFAULT_K_ROUTES, hour=12, dayOfWeek=2):
+    def findTopKPaths(self, start, goal, k=DEFAULT_K_ROUTES, timeSlot=12, dayOfWeek=2):
         allPaths = []
         startStr = str(start)
         goalStr = str(goal)
@@ -295,7 +295,7 @@ class PathFinder:
         if startStr not in self.graph or goalStr not in self.graph:
             return []
 
-        firstPath, firstCost, nodesExp = self.findPath(start, goal, hour, dayOfWeek)
+        firstPath, firstCost, nodesExp = self.findPath(start, goal, timeSlot, dayOfWeek)
         if not firstPath:
             return []
 
@@ -328,13 +328,13 @@ class PathFinder:
                 originalGraph = self.graph
                 self.graph = modGraph
 
-                spurPath, spurCost, _ = self.findPath(spurNode, goal, hour, dayOfWeek)
+                spurPath, spurCost, _ = self.findPath(spurNode, goal, timeSlot, dayOfWeek)
 
                 self.graph = originalGraph
 
                 if spurPath:
                     totalPath = rootPath[:-1] + spurPath
-                    totalCost = self.calcPathTime(totalPath, hour, dayOfWeek)
+                    totalCost = self.calcPathTime(totalPath, timeSlot, dayOfWeek)
                     if totalPath not in [p for p, _ in allPaths]:
                         heappush(potentialPaths, (totalCost, totalPath))
                         candidatesAdded += 1
@@ -361,7 +361,7 @@ class PathFinder:
         return result
 
     # run every algorithm and pool their routes, then deduplicate and return the best ones
-    def findUniquePaths(self, start, goal, hour=12, maxPaths=5, dayOfWeek=2):
+    def findUniquePaths(self, start, goal, timeSlot=12, maxPaths=5, dayOfWeek=2):
         # each algorithm finds up to maxPaths routes via Yen's spur method,
         # then pool everything, deduplicate and return the top maxPaths
         seen = {}
@@ -371,7 +371,7 @@ class PathFinder:
         for algoName in self.algorithms:
             print(f"\n--- {algoName.upper()} ---")
             self.setAlgorithm(algoName)
-            kPaths = self.findTopKPaths(start, goal, k=maxPaths, hour=hour, dayOfWeek=dayOfWeek)
+            kPaths = self.findTopKPaths(start, goal, k=maxPaths, timeSlot=timeSlot, dayOfWeek=dayOfWeek)
 
             for path, cost in kPaths:
                 key = tuple(path)

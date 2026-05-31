@@ -252,18 +252,23 @@ class TBRGSGUI:
 
         try:
             timeStr = self.timeVar.get()
-            hour = int(timeStr.split(':')[0]) if ':' in timeStr else int(timeStr)
-            hour = max(0, min(23, hour))
+            parts = timeStr.split(':')
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
+            # round minutes down to nearest 15
+            m = (m // 15) * 15
+            h = max(0, min(23, h))
+            timeSlot = h * 4 + m // 15
         except (ValueError, AttributeError):
-            hour = 12
+            timeSlot = 48  # default noon
 
         dayOfWeek = DAY_NAMES.index(self.dayVar.get())
 
-        return origin, dest, hour, dayOfWeek
+        return origin, dest, timeSlot, dayOfWeek
 
     # kick off a route search using all 6 algorithms and show the top results
     def findRoutes(self):
-        origin, dest, hour, dayOfWeek = self.getUserInput()
+        origin, dest, timeSlot, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -278,7 +283,7 @@ class TBRGSGUI:
 
         self.pathfinder.setModel(modelName)
 
-        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5, dayOfWeek=dayOfWeek)
+        paths = self.pathfinder.findUniquePaths(origin, dest, timeSlot, maxPaths=5, dayOfWeek=dayOfWeek)
 
         self.currentPaths = paths
         if paths:
@@ -290,17 +295,19 @@ class TBRGSGUI:
         if paths:
             self.selectRoute(0)
 
-        self.displayResults(origin, dest, hour, modelName, paths)
+        self.displayResults(origin, dest, timeSlot, modelName, paths)
 
     # format and print all found routes into the scrollable results box
-    def displayResults(self, origin, dest, hour, modelName, paths):
+    def displayResults(self, origin, dest, timeSlot, modelName, paths):
+        h, m = timeSlot // 4, (timeSlot % 4) * 15
+        timeLabel = f"{h:02d}:{m:02d}"
         SEP = "=" * 40
         self.resultsText.insert(tk.END, SEP + "\n")
         self.resultsText.insert(tk.END, "TBRGS ROUTE RESULTS\n")
         self.resultsText.insert(tk.END, SEP + "\n")
         self.resultsText.insert(tk.END, f"Origin:    SCATS {origin}\n")
         self.resultsText.insert(tk.END, f"Dest:      SCATS {dest}\n")
-        self.resultsText.insert(tk.END, f"Departure: {self.timeVar.get()} (Hour {hour}:00)\n")
+        self.resultsText.insert(tk.END, f"Departure: {timeLabel}\n")
         self.resultsText.insert(tk.END, f"ML Model:  {modelName.upper()}\n")
         self.resultsText.insert(tk.END, SEP + "\n\n")
 
@@ -342,7 +349,7 @@ class TBRGSGUI:
 
     # run all 6 algorithms on the same trip and print a side-by-side comparison
     def compareAlgos(self):
-        origin, dest, hour, dayOfWeek = self.getUserInput()
+        origin, dest, timeSlot, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -372,7 +379,7 @@ class TBRGSGUI:
         for algo, name in zip(algorithms, algoNames):
             self.pathfinder.setAlgorithm(algo)
             self.pathfinder.setModel(modelName)
-            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour, dayOfWeek)
+            path, cost, nodes = self.pathfinder.findPath(origin, dest, timeSlot, dayOfWeek)
 
             if path:
                 self.resultsText.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")

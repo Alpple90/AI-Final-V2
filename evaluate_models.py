@@ -47,7 +47,7 @@ def runEvaluation():
         _, metaDf = predictor.buildTestWindows(refDf)
         testScats = metaDf['SCATS Number'].tolist()
         testDays  = metaDf['Day of week'].tolist()
-        testHours = [int(str(t)[:2]) for t in metaDf['Time'].tolist()]
+        testTimeSlots = [int(str(t)[:2]) * 4 + int(str(t)[3:5]) // 15 for t in metaDf['Time'].tolist()]
     else:
         print("data_test_reference.csv not found — run loadData() first")
         return
@@ -60,7 +60,7 @@ def runEvaluation():
 
         nSamples = min(len(yTestActual), len(testScats))
         yPred = np.array([
-            predictor.predict(modelKey, testScats[i], testHours[i], testDays[i])
+            predictor.predict(modelKey, testScats[i], testTimeSlots[i], testDays[i])
             for i in range(nSamples)
         ], dtype=np.float32)
         yTestEval = yTestActual[:nSamples]
@@ -182,7 +182,7 @@ def runRouteAgreement(predictor):
     ]
 
     models = ['lstm', 'gru', 'xgboost']
-    hour = 8  # morning peak
+    timeSlot = 8 * 4  # 08:00 morning peak
 
     agreeCount = 0
     totalPairs = 0
@@ -192,7 +192,7 @@ def runRouteAgreement(predictor):
         for modelName in models:
             pathfinder.setModel(modelName)
             pathfinder.setAlgorithm('astar')
-            path, cost, _ = pathfinder.findPath(origin, dest, hour)
+            path, cost, _ = pathfinder.findPath(origin, dest, timeSlot)
             routes[modelName] = tuple(path) if path else None
 
         uniqueRoutes = set(r for r in routes.values() if r is not None)

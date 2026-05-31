@@ -344,7 +344,7 @@ class RealTrafficPredictor:
 
         return np.array(xWindows, dtype=np.float32), pd.DataFrame(meta)
 
-    # run all models over x_test once and cache results by (model, site, day, hour)
+    # run all models over x_test once and cache results by (model, site, day, timeSlot)
     def precomputePredictions(self, folder='saved_models'):
         print("--- Precomputing predictions for all models ---")
         os.makedirs(folder, exist_ok=True)
@@ -369,9 +369,10 @@ class RealTrafficPredictor:
             for i, row in metaDf.iterrows():
                 scatsNum = row['SCATS Number']
                 dow      = row['Day of week']
-                hour     = int(str(row['Time'])[:2])
+                t        = str(row['Time'])
+                timeSlot = int(t[:2]) * 4 + int(t[3:5]) // 15
 
-                cacheKey = (modelName, scatsNum, dow, hour)
+                cacheKey = (modelName, scatsNum, dow, timeSlot)
                 flow = max(0, float(yPred[i]))
 
                 if cacheKey in self.predictionCache:
@@ -393,17 +394,17 @@ class RealTrafficPredictor:
     # Predict
     # -------------------------------------------------------------------------
 
-    # look up a precomputed prediction from the cache
-    def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
+    # look up a precomputed prediction from the cache by 15-minute time slot (0-95)
+    def predict(self, modelName, scatsNum, timeSlot=48, dayOfWeek=2):
         scatsInt = int(scatsNum) if not isinstance(scatsNum, int) else scatsNum
-        key = (modelName, scatsInt, dayOfWeek, hourOfDay)
+        key = (modelName, scatsInt, dayOfWeek, timeSlot)
         if key in self.predictionCache:
             return self.predictionCache[key]
-        # Fall back to average across available days
+        # fall back to average across available days
         available = [
-            self.predictionCache[(modelName, scatsInt, d, hourOfDay)]
+            self.predictionCache[(modelName, scatsInt, d, timeSlot)]
             for d in range(7)
-            if (modelName, scatsInt, d, hourOfDay) in self.predictionCache
+            if (modelName, scatsInt, d, timeSlot) in self.predictionCache
         ]
         return int(np.mean(available)) if available else 100
 
