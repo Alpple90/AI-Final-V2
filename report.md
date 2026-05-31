@@ -200,15 +200,15 @@ All three models were evaluated on the held-out test split (October 25–31) of 
 
 | Model   | MAE   | RMSE  | R²     |
 |---------|-------|-------|--------|
-| LSTM    | 11.17 | 16.19 | 0.9492 |
-| GRU     | 11.18 | 16.19 | 0.9492 |
-| XGBoost | 10.22 | 14.90 | 0.9570 |
+| LSTM    | 32.76 | 50.84 | 0.9660 |
+| GRU     | 32.64 | 50.66 | 0.9662 |
+| XGBoost | 31.00 | 49.55 | 0.9677 |
 
 *Figure 2 — Predicted vs actual traffic volume for the first 500 test samples. MAE and R² are calculated over the full test set.*
 
 ![model_comparison.png]
 
-All three models achieve R² > 0.94, demonstrating a strong fit to the traffic volume time series. XGBoost achieves the lowest MAE (10.22) and highest R² (0.9570), outperforming LSTM by 0.95 MAE units and GRU by 0.96 MAE units.
+All three models achieve R² > 0.96, demonstrating a strong fit to the traffic volume time series. XGBoost achieves the lowest MAE (31.00) and highest R² (0.9677), outperforming LSTM by 1.76 MAE units and GRU by 1.63 MAE units.
 
 ### 4.3 Route Recommendation Agreement
 
@@ -224,7 +224,7 @@ This test was also run using the other heuristic-based search algorithms with th
 
 ### 5.1 LSTM vs GRU
 
-LSTM and GRU produced nearly identical results (MAE 11.17 vs 11.18, R² 0.9492 vs 0.9492). This is consistent with the literature — GRU was designed as a simplified LSTM, and on datasets of this size and regularity the additional gating in LSTM provides no measurable advantage. GRU trains faster due to its lower parameter count, making it the more practical choice when compute time is a concern.
+LSTM and GRU produced nearly identical results (MAE 32.76 vs 32.64, R² 0.9660 vs 0.9662). This is consistent with the literature — GRU was designed as a simplified LSTM, and on datasets of this size and regularity the additional gating in LSTM provides no measurable advantage. GRU trains slightly faster due to its lower parameter count, making it the more practical choice when compute time is a concern.
 
 ### 5.2 XGBoost Performance
 
@@ -278,7 +278,7 @@ where 0.5 minutes accounts for the 30-second intersection delay. This produces r
 
 ## 7. Conclusion
 
-The TBRGS successfully integrates machine learning traffic prediction with graph-based route search to produce a functional end-to-end system for the Boroondara network. All three ML models achieve high predictive accuracy (R² > 0.94) and produce identical routing recommendations across all tested origin-destination pairs, confirming that route guidance is robust to the choice of model.
+The TBRGS successfully integrates machine learning traffic prediction with graph-based route search to produce a functional end-to-end system for the Boroondara network. All three ML models achieve high predictive accuracy (R² > 0.96) and produce identical routing recommendations across all tested origin-destination pairs, confirming that route guidance is robust to the choice of model.
 
 XGBoost is the best-performing model by MAE and RMSE, benefiting from the strong periodicity of the October 2006 dataset. For deployment on a live or multi-year dataset, LSTM or GRU would be preferable due to their capacity to generalise across shifting traffic patterns without full retraining.
 
