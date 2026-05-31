@@ -50,6 +50,13 @@ class RealTrafficPredictor:
         df = pd.read_excel(excelFile)
         print(f"Loaded {len(df)} rows")
 
+        # Rename datetime.time column headers to 'HH:MM:00' strings
+        import datetime as _dt
+        df.columns = [
+            f'{c.hour:02d}:{c.minute:02d}:00' if isinstance(c, _dt.time) else c
+            for c in df.columns
+        ]
+
         # Identify time columns present in the DataFrame
         timeCols = [c for c in TIME_COLS if c in df.columns]
         print(f"Found {len(timeCols)} time columns")
