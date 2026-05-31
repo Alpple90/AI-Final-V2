@@ -1,292 +1,242 @@
 # real_traffic_models.py - LSTM, GRU and XGBoost traffic predictors
+# Rewritten using Parse/Model/Train/GetFlow approach with sin/cos encoding
 
 import numpy as np
 import pandas as pd
-from datetime import timedelta
 import os
 import joblib
 import warnings
 warnings.filterwarnings('ignore')
 
+from datetime import datetime
+import datetime as dt
+
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 
 import xgboost as xgb
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+# Time column names representing 15-min intervals across a day
+TIME_COLS = [f'{h:02d}:{m:02d}:00' for h in range(24) for m in (0, 15, 30, 45)]
+
+DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 
 class RealTrafficPredictor:
-    def __init__(self, seqLen=12, batchSize=32, lr=0.001):
+    def __init__(self, seqLen=12, batchSize=256, lr=0.001):
         self.seqLen = seqLen
         self.batchSize = batchSize
         self.lr = lr
         self.models = {}
-        self.scaler = StandardScaler()
+        self.scaler = None        # MinMaxScaler for flow values
+        self.scatsScaler = None   # MinMaxScaler for SCATS numbers
         self.trainingHistory = {}
-        self.siteHourTestSeq = {}
         self.predictionCache = {}
 
-    # read the SCATS Excel file, flatten it into sequences and split train/test
-    def loadData(self, excelFile='Scats Data October 2006.xls'):
-        print("--- Loading traffic data from Excel ---")
+    # -------------------------------------------------------------------------
+    # Parse logic
+    # -------------------------------------------------------------------------
 
-        df = pd.read_excel(excelFile, sheet_name='Data', header=1)
-        print(f"Loaded {len(df)} rows of traffic data")
+    def loadData(self, excelFile='TrafficDataCopy.xlsx'):
+        print("--- Loading traffic data from Excel (Parse logic) ---")
 
-        # grab volume columns (V0, V1, ... V95 etc.)
-        volCols = [col for col in df.columns if str(col).startswith('V') and str(col)[1:].isdigit()]
-        volCols = sorted(volCols, key=lambda x: int(x[1:]))
-        print(f"Found {len(volCols)} volume columns (15-min intervals)")
+        df = pd.read_excel(excelFile)
+        print(f"Loaded {len(df)} rows")
 
-        # --- Build per-site per-hour test sequence lookup (Oct 25-31 only) ---
-        # For each (site, dayOfWeek, hour), store the actual 12-reading sequence
-        # from the test week — the 3 hours of 15-min intervals leading into that hour
-        self.siteHourTestSeq = {}
+        # Identify time columns present in the DataFrame
+        timeCols = [c for c in TIME_COLS if c in df.columns]
+        print(f"Found {len(timeCols)} time columns")
 
-        for idx, row in df.iterrows():
-            scatsNum = row.get('SCATS Number')
-            if pd.isna(scatsNum):
-                continue
-            scatsStr = str(int(scatsNum))
+        # Group by SCATS Number + Date, summing time columns
+        df['Date'] = pd.to_datetime(df['Date'])
+        grouped = df.groupby(['SCATS Number', 'Date'])[timeCols].sum().reset_index()
 
-            volumes = []
-            for col in volCols:
-                vol = row.get(col, 0)
-                if pd.isna(vol):
-                    vol = 0
-                volumes.append(int(vol))
+        # Add Day of week (0=Monday ... 6=Sunday)
+        grouped['Day of week'] = grouped['Date'].dt.dayofweek
 
-            dateVal = row.get('Date', None)
-            if pd.isna(dateVal):
-                continue
-            baseTime = pd.to_datetime(dateVal)
-            if baseTime.day < 25:
-                continue  # only use test week (Oct 25-31)
+        # Extract day-of-month for splitting
+        grouped['_day'] = grouped['Date'].dt.day
 
-            dow = baseTime.dayofweek
-            for h in range(24):
-                startInterval = 4 * h - self.seqLen
-                if startInterval < 0:
-                    seq = [0] * (-startInterval) + volumes[0:4 * h]
-                else:
-                    seq = volumes[startInterval:4 * h]
-                if len(seq) < self.seqLen:
-                    seq = [0] * (self.seqLen - len(seq)) + seq
-                self.siteHourTestSeq[(scatsStr, dow, h)] = np.array(seq, dtype=np.float32)
+        # Split: train = day <= 24, test = day >= 24 (overlap at 24 for windowing)
+        trainDf = grouped[grouped['_day'] <= 24].copy()
+        testDf  = grouped[grouped['_day'] >= 24].copy()
 
-        print(f"Built siteHourTestSeq for {len(self.siteHourTestSeq)} (site, dayOfWeek, hour) pairs")
+        print(f"Train rows: {len(trainDf)}, Test rows: {len(testDf)}")
 
-        # --- Flatten all rows for model training ---
-        allVolumes = []
-        timestamps = []
-        allScats = []
+        # Fit scalers on training data
+        allScatsNums = grouped['SCATS Number'].unique().astype(float)
+        self.scatsScaler = MinMaxScaler(feature_range=(0, 1))
+        self.scatsScaler.fit(allScatsNums.reshape(-1, 1))
 
-        for idx, row in df.iterrows():
-            scatsNum = row.get('SCATS Number')
-            if pd.isna(scatsNum):
-                continue
+        trainFlows = trainDf[timeCols].values.flatten().reshape(-1, 1)
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.scaler.fit(trainFlows)
 
-            volumes = []
-            for col in volCols:
-                vol = row.get(col, 0)
-                if pd.isna(vol):
-                    vol = 0
-                volumes.append(int(vol))
+        # Build windows for train and test sets
+        xTrain, yTrain = self._buildWindows(trainDf, timeCols, fit=False)
+        xTest,  yTest  = self._buildWindows(testDf,  timeCols, fit=False)
 
-            dateVal = row.get('Date', None)
-            if pd.notna(dateVal):
-                allVolumes.extend(volumes)
-                scatsStr = str(scatsNum).lstrip('0').strip() or '0'
-                allScats.extend([scatsStr] * len(volumes))
-                baseTime = pd.to_datetime(dateVal)
-                for i in range(len(volumes)):
-                    timestamps.append(baseTime + timedelta(minutes=15 * i))
+        # Shuffle training windows
+        idx = np.random.permutation(len(xTrain))
+        xTrain = xTrain[idx]
+        yTrain = yTrain[idx]
 
-        print(f"Total volume samples collected: {len(allVolumes)}")
+        # Save reference CSVs (needed by buildReference / precomputePredictions)
+        self._saveReference(trainDf, timeCols, 'data_train_reference.csv')
+        self._saveReference(testDf,  timeCols, 'data_test_reference.csv')
 
-        hours = [ts.hour for ts in timestamps]
-        dayOfWeek = [ts.dayofweek for ts in timestamps]
+        print(f"Training windows: {len(xTrain)}, Test windows: {len(xTest)}")
+        print(f"Window shape: {xTrain.shape}")  # (N, 12, 6)
 
-        # build sliding window sequences
-        X, y, seqScats = [], [], []
-        for i in range(len(allVolumes) - self.seqLen - 1):
-            X.append(allVolumes[i:i + self.seqLen])
-            y.append(allVolumes[i + self.seqLen])
-            seqScats.append(allScats[i + self.seqLen])
-
-        X = np.array(X, dtype=np.float32)
-        y = np.array(y, dtype=np.float32)
-        print(f"Created {len(X)} training sequences")
-
-        timeFeatures = np.column_stack([
-            hours[self.seqLen:-1],
-            dayOfWeek[self.seqLen:-1]
-        ])
-
-        # split at Oct 25 — first 3 weeks train, last week (Oct 25-31) test
-        # timestamps offset by seqLen since each window target is seqLen steps ahead
-        splitIdx = next(
-            i for i, ts in enumerate(timestamps[self.seqLen:-1])
-            if ts.day >= 25
-        )
-
-        xTrainSeq = X[:splitIdx]
-        xTestSeq = X[splitIdx:]
-        yTrain = y[:splitIdx]
-        yTest = y[splitIdx:]
-        timeTrain = timeFeatures[:splitIdx]
-        timeTest = timeFeatures[splitIdx:]
-        testScats = seqScats[splitIdx:]
-        testHours = hours[self.seqLen:-1][splitIdx:]
-        testDays  = dayOfWeek[self.seqLen:-1][splitIdx:]
-
-        # normalize flow values
-        xTrainFlat = xTrainSeq.reshape(-1, self.seqLen)
-        xTestFlat = xTestSeq.reshape(-1, self.seqLen)
-
-        self.scaler.fit(xTrainFlat)
-        xTrainNorm = self.scaler.transform(xTrainFlat)
-        xTestNorm = self.scaler.transform(xTestFlat)
-
-        # reshape for LSTM/GRU
-        xTrainLstm = xTrainNorm.reshape(-1, self.seqLen, 1)
-        xTestLstm = xTestNorm.reshape(-1, self.seqLen, 1)
-
-        # append time features for XGBoost
-        xTrainXgb = np.column_stack([xTrainNorm, timeTrain])
-        xTestXgb = np.column_stack([xTestNorm, timeTest])
-
-        print(f"Training samples: {len(xTrainLstm)}")
-        print(f"Test samples: {len(xTestLstm)}")
+        # Flatten for XGBoost
+        xTrainFlat = xTrain.reshape(len(xTrain), -1)   # (N, 72)
+        xTestFlat  = xTest.reshape(len(xTest),  -1)
 
         return {
-            'X_train_lstm': xTrainLstm,
-            'X_test_lstm': xTestLstm,
-            'X_train_xgb': xTrainXgb,
-            'X_test_xgb': xTestXgb,
+            'x_train': xTrain,
+            'x_test':  xTest,
+            'x_train_flat': xTrainFlat,
+            'x_test_flat':  xTestFlat,
             'y_train': yTrain,
-            'y_test': yTest,
-            'test_scats': testScats,
-            'test_days': testDays,
-            'test_hours': testHours,
+            'y_test':  yTest,
         }
 
-    # define and compile a stacked LSTM network for traffic volume prediction
-    def buildLSTM(self):
-        model = Sequential([
-            Input(shape=(self.seqLen, 1)),
-            LSTM(128, return_sequences=True),
-            Dropout(0.2),
-            LSTM(64, return_sequences=True),
-            Dropout(0.2),
-            LSTM(32),
-            Dropout(0.2),
-            Dense(16, activation='relu'),
-            Dense(1)
-        ])
-        optimizer = Adam(learning_rate=self.lr)
-        model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
-        return model
-
-    # define and compile a stacked GRU network for traffic volume prediction
-    def buildGRU(self):
-        model = Sequential([
-            Input(shape=(self.seqLen, 1)),
-            GRU(128, return_sequences=True),
-            Dropout(0.2),
-            GRU(64, return_sequences=True),
-            Dropout(0.2),
-            GRU(32),
-            Dropout(0.2),
-            Dense(16, activation='relu'),
-            Dense(1)
-        ])
-        optimizer = Adam(learning_rate=self.lr)
-        model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
-        return model
-
-    # train the LSTM model with early stopping and store it internally
-    def trainLSTM(self, xTrain, yTrain, xTest, yTest, epochs=50, verbose=True):
-        if verbose:
-            print("--- Training LSTM model ---")
-            print(f"Training samples: {len(xTrain)}")
-            print(f"Validation samples: {len(xTest)}")
-
-        model = self.buildLSTM()
-
-        earlyStop = EarlyStopping(
-            monitor='val_loss',
-            patience=15,
-            restore_best_weights=True,
-            verbose=verbose
+    def _meltToLong(self, df, timeCols):
+        """Melt a grouped df to long format with Time and Flow columns."""
+        melted = df.melt(
+            id_vars=['SCATS Number', 'Date', 'Day of week'],
+            value_vars=timeCols,
+            var_name='Time',
+            value_name='Flow'
         )
+        # Convert Time string to datetime.time object
+        melted['Time'] = melted['Time'].apply(
+            lambda s: dt.time(int(s[:2]), int(s[3:5]), int(s[6:8]))
+        )
+        melted = melted.sort_values(['SCATS Number', 'Date', 'Time']).reset_index(drop=True)
+        return melted
+
+    def _addCyclicalFeatures(self, melted):
+        """Add sin/cos encoding for Day of week (period 7) and Time slot (period 96)."""
+        # Time slot index 0-95
+        melted['_timeIdx'] = melted['Time'].apply(
+            lambda t: t.hour * 4 + t.minute // 15
+        )
+        dow = melted['Day of week'].values
+        tidx = melted['_timeIdx'].values
+
+        melted['day_sin']  = np.sin(2 * np.pi * dow  / 7)
+        melted['day_cos']  = np.cos(2 * np.pi * dow  / 7)
+        melted['time_sin'] = np.sin(2 * np.pi * tidx / 96)
+        melted['time_cos'] = np.cos(2 * np.pi * tidx / 96)
+        return melted
+
+    def _buildWindows(self, df, timeCols, fit=False):
+        """Build sliding windows of shape (seqLen, 6) per site."""
+        melted = self._meltToLong(df, timeCols)
+        melted = self._addCyclicalFeatures(melted)
+
+        # Normalize scats numbers and flow
+        scatsNorm = self.scatsScaler.transform(
+            melted['SCATS Number'].values.astype(float).reshape(-1, 1)
+        ).flatten()
+        flowNorm = self.scaler.transform(
+            melted['Flow'].values.reshape(-1, 1)
+        ).flatten()
+
+        melted['_scats_norm'] = scatsNorm
+        melted['_flow_norm']  = flowNorm
+
+        X, y = [], []
+        featureCols = ['_scats_norm', '_flow_norm', 'day_sin', 'day_cos', 'time_sin', 'time_cos']
+
+        for scat, siteData in melted.groupby('SCATS Number'):
+            siteData = siteData.reset_index(drop=True)
+            features = siteData[featureCols].values  # (T, 6)
+            flows    = siteData['_flow_norm'].values  # (T,)
+
+            for i in range(self.seqLen, len(features)):
+                X.append(features[i - self.seqLen:i])   # (12, 6)
+                y.append(flows[i])
+
+        return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
+
+    def _saveReference(self, df, timeCols, filename):
+        """Melt df to long and save to CSV for GetFlow reference."""
+        melted = self._meltToLong(df, timeCols)
+        melted = self._addCyclicalFeatures(melted)
+        melted.to_csv(filename, index=False)
+
+    # -------------------------------------------------------------------------
+    # Model builders (Model.py logic)
+    # -------------------------------------------------------------------------
+
+    def _buildSequentialModel(self, layerType):
+        """Build 2-layer LSTM or GRU with Dropout, sigmoid output."""
+        LayerCls = LSTM if layerType == 'lstm' else GRU
+        model = Sequential([
+            Input(shape=(self.seqLen, 6)),
+            LayerCls(64, return_sequences=True),
+            Dropout(0.2),
+            LayerCls(64),
+            Dropout(0.2),
+            Dense(1, activation='sigmoid')
+        ])
+        return model
+
+    # -------------------------------------------------------------------------
+    # Train logic
+    # -------------------------------------------------------------------------
+
+    def _trainDeepModel(self, modelName, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
+        if verbose:
+            print(f"--- Training {modelName.upper()} model ---")
+            print(f"Training samples: {len(xTrain)}, Validation samples: {len(xTest)}")
+
+        model = self._buildSequentialModel(modelName)
+        model.compile(loss='mse', optimizer='adam', metrics=['mape'])
+
+        callbacks = [
+            EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True),
+            ReduceLROnPlateau(factor=0.5, patience=10, min_lr=1e-6)
+        ]
 
         os.makedirs('saved_models', exist_ok=True)
 
         history = model.fit(
             xTrain, yTrain,
-            validation_data=(xTest, yTest),
+            validation_split=0.05,
             epochs=epochs,
             batch_size=self.batchSize,
-            callbacks=[earlyStop],
+            callbacks=callbacks,
             verbose=1 if verbose else 0
         )
 
-        self.models['lstm'] = model
-        self.trainingHistory['lstm'] = history.history
+        self.models[modelName] = model
+        self.trainingHistory[modelName] = history.history
 
         if verbose:
-            self.evalModel('lstm', model, xTest, yTest)
+            self.evalModel(modelName, model, xTest, yTest)
 
         return model
 
-    # train the GRU model with early stopping and store it internally
-    def trainGRU(self, xTrain, yTrain, xTest, yTest, epochs=50, verbose=True):
-        if verbose:
-            print("--- Training GRU model ---")
-            print(f"Training samples: {len(xTrain)}")
-            print(f"Validation samples: {len(xTest)}")
+    def trainLSTM(self, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
+        return self._trainDeepModel('lstm', xTrain, yTrain, xTest, yTest, epochs, verbose)
 
-        model = self.buildGRU()
+    def trainGRU(self, xTrain, yTrain, xTest, yTest, epochs=600, verbose=True):
+        return self._trainDeepModel('gru', xTrain, yTrain, xTest, yTest, epochs, verbose)
 
-        earlyStop = EarlyStopping(
-            monitor='val_loss',
-            patience=15,
-            restore_best_weights=True,
-            verbose=verbose
-        )
-
-        os.makedirs('saved_models', exist_ok=True)
-
-        history = model.fit(
-            xTrain, yTrain,
-            validation_data=(xTest, yTest),
-            epochs=epochs,
-            batch_size=self.batchSize,
-            callbacks=[earlyStop],
-            verbose=1 if verbose else 0
-        )
-
-        self.models['gru'] = model
-        self.trainingHistory['gru'] = history.history
-
-        if verbose:
-            self.evalModel('gru', model, xTest, yTest)
-
-        return model
-
-    # fit an XGBoost regressor with tuned hyperparameters and store it internally
-    def trainXGB(self, xTrain, yTrain, xTest, yTest, verbose=True):
+    def trainXGB(self, xTrainFlat, yTrain, xTestFlat, yTest, verbose=True):
         if verbose:
             print("--- Training XGBoost model ---")
-            print(f"Training samples: {len(xTrain)}")
-            print(f"Feature count: {xTrain.shape[1]}")
+            print(f"Training samples: {len(xTrainFlat)}, Features: {xTrainFlat.shape[1]}")
 
         params = {
             'n_estimators': 200,
@@ -303,127 +253,167 @@ class RealTrafficPredictor:
         }
 
         model = xgb.XGBRegressor(**params)
-        model.fit(xTrain, yTrain, verbose=False)
+        model.fit(xTrainFlat, yTrain, verbose=False)
 
         self.models['xgboost'] = model
 
         if verbose:
-            self.evalModel('xgboost', model, xTest, yTest)
-            self.printFeatureImportance(model)
+            self.evalModel('xgboost', model, xTestFlat, yTest)
 
         return model
 
-    # compute MAE, RMSE and R2 on the test set and print them
+    # -------------------------------------------------------------------------
+    # GetFlow logic
+    # -------------------------------------------------------------------------
+
+    def _buildReference(self):
+        """Read data_test_reference.csv, return meta df with (SCATS Number, Day of week, Time)."""
+        refDf = pd.read_csv('data_test_reference.csv')
+        # Convert Time back to string (it was saved as HH:MM:SS)
+        refDf['Time'] = refDf['Time'].astype(str)
+        return refDf
+
+    def _buildTestWindows(self, refDf):
+        """Rebuild x_test windows from the reference CSV in the same order as training."""
+        featureCols = ['_scats_norm', '_flow_norm', 'day_sin', 'day_cos', 'time_sin', 'time_cos']
+
+        # Re-normalise (refDf already has the computed columns from _saveReference)
+        # But CSV load may have lost them — recompute if missing
+        if '_scats_norm' not in refDf.columns:
+            scatsNorm = self.scatsScaler.transform(
+                refDf['SCATS Number'].values.astype(float).reshape(-1, 1)
+            ).flatten()
+            refDf['_scats_norm'] = scatsNorm
+
+        if '_flow_norm' not in refDf.columns:
+            flowNorm = self.scaler.transform(
+                refDf['Flow'].values.reshape(-1, 1)
+            ).flatten()
+            refDf['_flow_norm'] = flowNorm
+
+        if 'day_sin' not in refDf.columns:
+            dow  = refDf['Day of week'].values
+            tidx = refDf['_timeIdx'].values
+            refDf['day_sin']  = np.sin(2 * np.pi * dow  / 7)
+            refDf['day_cos']  = np.cos(2 * np.pi * dow  / 7)
+            refDf['time_sin'] = np.sin(2 * np.pi * tidx / 96)
+            refDf['time_cos'] = np.cos(2 * np.pi * tidx / 96)
+
+        xWindows, meta = [], []
+        for scat, siteData in refDf.groupby('SCATS Number'):
+            siteData = siteData.reset_index(drop=True)
+            features = siteData[featureCols].values
+            for i in range(self.seqLen, len(features)):
+                xWindows.append(features[i - self.seqLen:i])
+                row = siteData.iloc[i]
+                meta.append({
+                    'SCATS Number': int(scat),
+                    'Day of week':  int(row['Day of week']),
+                    'Time':         str(row['Time']),
+                })
+
+        return np.array(xWindows, dtype=np.float32), pd.DataFrame(meta)
+
+    def precomputePredictions(self, folder='saved_models'):
+        """GetFlow precompute: run model.predict on full x_test, cache results."""
+        print("--- Precomputing predictions for all models ---")
+        os.makedirs(folder, exist_ok=True)
+
+        refDf = self._buildReference()
+        xTest, metaDf = self._buildTestWindows(refDf)
+
+        self.predictionCache = {}
+
+        for modelName, model in self.models.items():
+            print(f"  {modelName}...")
+
+            if modelName in ('lstm', 'gru'):
+                yPredScaled = model.predict(xTest, verbose=0).flatten()
+            else:
+                xFlat = xTest.reshape(len(xTest), -1)
+                yPredScaled = model.predict(xFlat).flatten()
+
+            # Inverse-transform flow predictions
+            yPred = self.scaler.inverse_transform(yPredScaled.reshape(-1, 1)).flatten()
+
+            for i, row in metaDf.iterrows():
+                scatsNum = row['SCATS Number']
+                dow      = row['Day of week']
+                timeStr  = row['Time']  # 'HH:MM:SS'
+                hour     = int(timeStr[:2])
+
+                cacheKey = (modelName, scatsNum, dow, hour)
+                flow = max(0, float(yPred[i]))
+
+                # Average if multiple predictions for same key
+                if cacheKey in self.predictionCache:
+                    existing = self.predictionCache[cacheKey]
+                    self.predictionCache[cacheKey] = (existing + flow) / 2
+                else:
+                    self.predictionCache[cacheKey] = flow
+
+        # Convert to int
+        self.predictionCache = {k: max(5, int(v)) for k, v in self.predictionCache.items()}
+
+        joblib.dump(self.predictionCache, f'{folder}/prediction_cache.joblib')
+        joblib.dump(self.scaler,       f'{folder}/scaler.joblib')
+        joblib.dump(self.scatsScaler,  f'{folder}/scats_scaler.joblib')
+        print(f"  Saved {len(self.predictionCache)} predictions to {folder}/")
+
+    # -------------------------------------------------------------------------
+    # Predict
+    # -------------------------------------------------------------------------
+
+    def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
+        """Look up precomputed prediction. Key: (modelName, scatsNum_int, dow_int, hour_int)."""
+        scatsInt = int(scatsNum) if not isinstance(scatsNum, int) else scatsNum
+        key = (modelName, scatsInt, dayOfWeek, hourOfDay)
+        if key in self.predictionCache:
+            return self.predictionCache[key]
+        # Fall back to average across available days
+        available = [
+            self.predictionCache[(modelName, scatsInt, d, hourOfDay)]
+            for d in range(7)
+            if (modelName, scatsInt, d, hourOfDay) in self.predictionCache
+        ]
+        return int(np.mean(available)) if available else 100
+
+    # -------------------------------------------------------------------------
+    # Eval
+    # -------------------------------------------------------------------------
+
     def evalModel(self, name, model, xTest, yTest):
-        if name in ['lstm', 'gru']:
+        if name in ('lstm', 'gru'):
             yPred = model.predict(xTest, verbose=0).flatten()
         else:
             yPred = model.predict(xTest)
 
-        mae = mean_absolute_error(yTest, yPred)
-        rmse = np.sqrt(mean_squared_error(yTest, yPred))
-        r2 = r2_score(yTest, yPred)
+        # Inverse-transform if scaler is available
+        if self.scaler is not None:
+            yPredInv = self.scaler.inverse_transform(yPred.reshape(-1, 1)).flatten()
+            yTestInv = self.scaler.inverse_transform(np.array(yTest).reshape(-1, 1)).flatten()
+        else:
+            yPredInv = yPred
+            yTestInv = yTest
+
+        mae  = mean_absolute_error(yTestInv, yPredInv)
+        rmse = np.sqrt(mean_squared_error(yTestInv, yPredInv))
+        r2   = r2_score(yTestInv, yPredInv)
 
         print(f"\n{name.upper()} Performance:")
-        print(f"  MAE:  {mae:.2f} vehicles/15min")
-        print(f"  RMSE: {rmse:.2f} vehicles/15min")
+        print(f"  MAE:  {mae:.2f}")
+        print(f"  RMSE: {rmse:.2f}")
         print(f"  R2:   {r2:.4f}")
 
         if name not in self.trainingHistory:
             self.trainingHistory[name] = {}
-        self.trainingHistory[name]['test_mae'] = mae
+        self.trainingHistory[name]['test_mae']  = mae
         self.trainingHistory[name]['test_rmse'] = rmse
-        self.trainingHistory[name]['test_r2'] = r2
+        self.trainingHistory[name]['test_r2']   = r2
 
-    # print how much each input feature contributed to the XGBoost model
-    def printFeatureImportance(self, model):
-        importance = model.feature_importances_
-        print("\nXGBoost Feature Importance:")
-        print(f"  Past 12 traffic volumes: {importance[:self.seqLen].sum():.3f}")
-        if importance.shape[0] > self.seqLen:
-            print(f"  Hour of day:            {importance[self.seqLen]:.3f}")
-        if importance.shape[0] > self.seqLen + 1:
-            print(f"  Day of week:            {importance[self.seqLen + 1]:.3f}")
-
-    # precompute predictions for every (model, site, dayOfWeek, hour) and save to disk
-    def precomputePredictions(self, folder='saved_models'):
-        print("--- Precomputing predictions for all models, sites, days and hours ---")
-        self.predictionCache = {}
-        sites = list({k[0] for k in self.siteHourTestSeq})
-
-        for modelName, model in self.models.items():
-            print(f"  {modelName}...")
-            for scatsStr in sites:
-                for dow in range(7):
-                    seqs, keys = [], []
-                    for h in range(24):
-                        key = (scatsStr, dow, h)
-                        if key not in self.siteHourTestSeq:
-                            continue
-                        lastSeq = list(self.siteHourTestSeq[key])
-                        seqs.append(lastSeq)
-                        keys.append((modelName, scatsStr, dow, h))
-
-                    if not seqs:
-                        continue
-
-                    seqArray = np.array(seqs, dtype=np.float32)
-                    seqNorm = self.scaler.transform(seqArray)
-
-                    if modelName in ['lstm', 'gru']:
-                        seqInput = seqNorm.reshape(len(seqs), self.seqLen, 1)
-                        predsNorm = model.predict(seqInput, verbose=0).flatten()
-                        preds = predsNorm * self.scaler.scale_[0] + self.scaler.mean_[0]
-                    else:
-                        hours = np.array([[k[3]] for k in keys])
-                        dows  = np.array([[k[2]] for k in keys])
-                        features = np.column_stack([seqNorm, hours, dows])
-                        preds = model.predict(features)
-
-                    for key, pred in zip(keys, preds):
-                        self.predictionCache[key] = max(5, int(pred))
-
-        os.makedirs(folder, exist_ok=True)
-        joblib.dump(self.predictionCache, f'{folder}/prediction_cache.joblib')
-        print(f"  Saved {len(self.predictionCache)} predictions to {folder}/prediction_cache.joblib")
-
-    # look up a precomputed prediction — (model, site, dayOfWeek, hour)
-    def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
-        key = (modelName, str(scatsNum), dayOfWeek, hourOfDay)
-        if key in self.predictionCache:
-            return self.predictionCache[key]
-        # site missing for this day — use average across available days
-        available = [self.predictionCache[(modelName, str(scatsNum), d, hourOfDay)]
-                     for d in range(7) if (modelName, str(scatsNum), d, hourOfDay) in self.predictionCache]
-        return int(np.mean(available)) if available else 100
-
-    # write all trained models and the scaler to disk
-    # build the test sequence lookup from the Excel file without full training data prep
-    def buildTestSeqLookup(self, excelFile='Scats Data October 2006.xls'):
-        print("--- Building test sequence lookup from Excel ---")
-        df = pd.read_excel(excelFile, sheet_name='Data', header=1)
-        volCols = sorted(
-            [col for col in df.columns if str(col).startswith('V') and str(col)[1:].isdigit()],
-            key=lambda x: int(x[1:])
-        )
-        self.siteHourTestSeq = {}
-        for _, row in df.iterrows():
-            scatsNum = row.get('SCATS Number')
-            dateVal  = row.get('Date', None)
-            if pd.isna(scatsNum) or pd.isna(dateVal):
-                continue
-            baseTime = pd.to_datetime(dateVal)
-            if baseTime.day < 25:
-                continue
-            scatsStr = str(int(scatsNum))
-            volumes = [int(row.get(col, 0) or 0) for col in volCols]
-            dow = baseTime.dayofweek
-            for h in range(24):
-                start = 4 * h - self.seqLen
-                seq = ([0] * max(0, -start) + volumes[max(0, start):4 * h])[-self.seqLen:]
-                seq = [0] * (self.seqLen - len(seq)) + seq
-                self.siteHourTestSeq[(scatsStr, dow, h)] = np.array(seq, dtype=np.float32)
-        print(f"Built siteHourTestSeq for {len(self.siteHourTestSeq)} (site, dayOfWeek, hour) pairs")
+    # -------------------------------------------------------------------------
+    # Save / Load
+    # -------------------------------------------------------------------------
 
     def saveModels(self, folder='saved_models'):
         os.makedirs(folder, exist_ok=True)
@@ -440,15 +430,13 @@ class RealTrafficPredictor:
             joblib.dump(self.models['xgboost'], f'{folder}/xgboost_model.joblib')
             print(f"XGBoost model saved to {folder}/xgboost_model.joblib")
 
-        joblib.dump(self.scaler, f'{folder}/scaler.joblib')
-        print(f"Scaler saved to {folder}/scaler.joblib")
-
-        joblib.dump(self.siteHourTestSeq, f'{folder}/site_hour_test_seq.joblib')
-        print(f"Test sequence lookup saved to {folder}/")
+        if self.scaler is not None:
+            joblib.dump(self.scaler,      f'{folder}/scaler.joblib')
+            joblib.dump(self.scatsScaler, f'{folder}/scats_scaler.joblib')
+            print(f"Scalers saved to {folder}/")
 
         self.precomputePredictions(folder)
 
-    # load previously saved models and scaler from disk, returns False if nothing found
     def loadModels(self, folder='saved_models'):
         if not os.path.exists(folder):
             print(f"Folder {folder} not found. Will train new models.")
@@ -459,17 +447,14 @@ class RealTrafficPredictor:
         lstmPath = f'{folder}/lstm_model.keras'
         if os.path.exists(lstmPath):
             self.models['lstm'] = load_model(lstmPath, compile=False)
-            # recompile so we can keep training later if needed
-            self.models['lstm'].compile(optimizer=Adam(learning_rate=self.lr),
-                                        loss='mse', metrics=['mae'])
+            self.models['lstm'].compile(loss='mse', optimizer='adam', metrics=['mape'])
             print(f"LSTM model loaded from {lstmPath}")
             loaded = True
 
         gruPath = f'{folder}/gru_model.keras'
         if os.path.exists(gruPath):
             self.models['gru'] = load_model(gruPath, compile=False)
-            self.models['gru'].compile(optimizer=Adam(learning_rate=self.lr),
-                                       loss='mse', metrics=['mae'])
+            self.models['gru'].compile(loss='mse', optimizer='adam', metrics=['mape'])
             print(f"GRU model loaded from {gruPath}")
             loaded = True
 
@@ -482,21 +467,18 @@ class RealTrafficPredictor:
         scalerPath = f'{folder}/scaler.joblib'
         if os.path.exists(scalerPath):
             self.scaler = joblib.load(scalerPath)
-            print(f"Scaler loaded from {scalerPath}")
+            print(f"Flow scaler loaded from {scalerPath}")
 
-        testSeqPath = f'{folder}/site_hour_test_seq.joblib'
-        if os.path.exists(testSeqPath):
-            self.siteHourTestSeq = joblib.load(testSeqPath)
-        else:
-            self.buildTestSeqLookup()
-            joblib.dump(self.siteHourTestSeq, testSeqPath)
-            print(f"Test sequence lookup built and saved to {testSeqPath}")
+        scatsScalerPath = f'{folder}/scats_scaler.joblib'
+        if os.path.exists(scatsScalerPath):
+            self.scatsScaler = joblib.load(scatsScalerPath)
+            print(f"SCATS scaler loaded from {scatsScalerPath}")
 
         cachePath = f'{folder}/prediction_cache.joblib'
         if os.path.exists(cachePath):
             self.predictionCache = joblib.load(cachePath)
-            print(f"Prediction cache loaded from {cachePath}")
-        else:
+            print(f"Prediction cache loaded ({len(self.predictionCache)} entries)")
+        elif loaded and self.scaler is not None:
             self.precomputePredictions(folder)
 
         return loaded
@@ -506,25 +488,25 @@ class RealTrafficPredictor:
 def trainAllModels():
     print("--- Training all traffic prediction models ---")
 
-    predictor = RealTrafficPredictor(seqLen=12, batchSize=32, lr=0.001)
+    predictor = RealTrafficPredictor(seqLen=12, batchSize=256, lr=0.001)
 
-    data = predictor.loadData('Scats Data October 2006.xls')
+    data = predictor.loadData('TrafficDataCopy.xlsx')
 
-    print("\nStarting training (this may take 5-10 minutes)...")
+    print("\nStarting training (this may take a while)...")
 
     predictor.trainLSTM(
-        data['X_train_lstm'], data['y_train'],
-        data['X_test_lstm'], data['y_test'], epochs=30
+        data['x_train'], data['y_train'],
+        data['x_test'],  data['y_test'], epochs=600
     )
 
     predictor.trainGRU(
-        data['X_train_lstm'], data['y_train'],
-        data['X_test_lstm'], data['y_test'], epochs=30
+        data['x_train'], data['y_train'],
+        data['x_test'],  data['y_test'], epochs=600
     )
 
     predictor.trainXGB(
-        data['X_train_xgb'], data['y_train'],
-        data['X_test_xgb'], data['y_test']
+        data['x_train_flat'], data['y_train'],
+        data['x_test_flat'],  data['y_test']
     )
 
     predictor.saveModels()

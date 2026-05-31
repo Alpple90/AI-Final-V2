@@ -1,5 +1,7 @@
 # evaluate_models.py - compare LSTM, GRU and XGBoost on held-out test data
+import os
 import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -24,13 +26,31 @@ def runEvaluation():
         print("No saved models found. Run real_traffic_models.py first to train.")
         return
 
-    yTest      = data['y_test']
-    testScats  = data['test_scats']
-    testHours  = data['test_hours']
-    testDays   = data['test_days']
+    yTest = data['y_test']
 
+    # Build test meta from prediction cache keys so we can evaluate per-window
+    # For each test window we need (scatsNum, dayOfWeek, hour) — derive from cache
     results = {}
     modelKeys = [('LSTM', 'lstm'), ('GRU', 'gru'), ('XGBoost', 'xgboost')]
+
+    # Inverse-transform y_test for evaluation
+    if predictor.scaler is not None:
+        yTestActual = predictor.scaler.inverse_transform(
+            np.array(yTest).reshape(-1, 1)
+        ).flatten()
+    else:
+        yTestActual = np.array(yTest, dtype=np.float32)
+
+    # Rebuild test windows to get meta (site, day, hour) for each sample
+    if os.path.exists('data_test_reference.csv'):
+        refDf = pd.read_csv('data_test_reference.csv')
+        _, metaDf = predictor._buildTestWindows(refDf)
+        testScats = metaDf['SCATS Number'].tolist()
+        testDays  = metaDf['Day of week'].tolist()
+        testHours = [int(str(t)[:2]) for t in metaDf['Time'].tolist()]
+    else:
+        print("data_test_reference.csv not found — run loadData() first")
+        return
 
     print("--- Generating predictions ---")
     for displayName, modelKey in modelKeys:
@@ -38,14 +58,16 @@ def runEvaluation():
             print(f"  {displayName}: model not found, skipping")
             continue
 
+        nSamples = min(len(yTestActual), len(testScats))
         yPred = np.array([
             predictor.predict(modelKey, testScats[i], testHours[i], testDays[i])
-            for i in range(len(yTest))
+            for i in range(nSamples)
         ], dtype=np.float32)
+        yTestEval = yTestActual[:nSamples]
 
-        mae  = mean_absolute_error(yTest, yPred)
-        rmse = np.sqrt(mean_squared_error(yTest, yPred))
-        r2   = r2_score(yTest, yPred)
+        mae  = mean_absolute_error(yTestEval, yPred)
+        rmse = np.sqrt(mean_squared_error(yTestEval, yPred))
+        r2   = r2_score(yTestEval, yPred)
 
         results[displayName] = {'mae': mae, 'rmse': rmse, 'r2': r2, 'preds': yPred}
         print(f"  {displayName} done")
@@ -75,7 +97,7 @@ def runEvaluation():
     xAxis = np.arange(plotLimit)
 
     for ax, (name, metrics) in zip(axes, results.items()):
-        yActual = yTest[:plotLimit]
+        yActual = yTestActual[:plotLimit]
         yPredPlot = metrics['preds'][:plotLimit]
         ax.plot(xAxis, yActual, label='Actual', alpha=0.7)
         ax.plot(xAxis, yPredPlot, label='Predicted', alpha=0.7)
