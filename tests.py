@@ -102,7 +102,19 @@ class TestPathFinderBasic(unittest.TestCase):
         self.assertIsNotNone(path)
         self.assertIn(2000, path)
 
-    # test 9: same origin and destination returns None or cost 0
+    # test 9: Greedy finds a path between two connected nodes
+    def test_greedy_findsPath(self):
+        path, cost, _ = self.pf.greedy('970', '2000')
+        self.assertIsNotNone(path)
+        self.assertIn(2000, path)
+
+    # test 10: Bidirectional A* finds a path between two connected nodes
+    def test_bidirectionalAstar_findsPath(self):
+        path, cost, _ = self.pf.bidirectionalAstar('970', '2000')
+        self.assertIsNotNone(path)
+        self.assertIn(2000, path)
+
+    # test 11: same origin and destination returns None or cost 0
     def test_sameOriginDest_returnNoneOrZero(self):
         path, cost, _ = self.pf.astar('970', '970')
         # either no path or trivial zero-length path with cost 0
@@ -114,18 +126,18 @@ class TestPathFinderEdgeCases(unittest.TestCase):
     def setUp(self):
         self.pf = makePathFinder()
 
-    # test 10: unknown node returns None path
+    # test 12: unknown node returns None path
     def test_invalidNode_returnsNone(self):
         path, cost, _ = self.pf.astar('970', '9999')
         self.assertIsNone(path)
 
-    # test 11: path cost is > 0 for a valid route
+    # test 13: path cost is > 0 for a valid route
     def test_pathCost_greaterThanZero(self):
         path, cost, _ = self.pf.astar('970', '2000')
         self.assertIsNotNone(path)
         self.assertGreater(cost, 0)
 
-    # test 12: path is a list of ints
+    # test 14: path is a list of ints
     def test_path_isListOfInts(self):
         path, _, _ = self.pf.astar('970', '4043')
         self.assertIsNotNone(path)
@@ -144,18 +156,18 @@ class TestFindUniquePaths(unittest.TestCase):
     def tearDown(self):
         sys.stdout = self._stdout
 
-    # test 13: findUniquePaths returns at most 5 routes
+    # test 15: findUniquePaths returns at most 5 routes
     def test_findUniquePaths_atMostFive(self):
         routes = self.pf.findUniquePaths('970', '2000', maxPaths=5)
         self.assertLessEqual(len(routes), 5)
 
-    # test 14: routes are sorted ascending by cost
+    # test 16: routes are sorted ascending by cost
     def test_findUniquePaths_sortedByCost(self):
         routes = self.pf.findUniquePaths('970', '2000', maxPaths=5)
         costs = [c for _, c, _ in routes]
         self.assertEqual(costs, sorted(costs))
 
-    # test 15: no duplicate paths returned
+    # test 17: no duplicate paths returned
     def test_findUniquePaths_noDuplicates(self):
         routes = self.pf.findUniquePaths('970', '2000', maxPaths=5)
         pathTuples = [tuple(p) for p, _, _ in routes]
