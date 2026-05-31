@@ -8,3 +8,5 @@ keras>=3.14.0
 joblib>=1.1.0
 matplotlib>=3.5.0
 tkintermapview>=1.0.0
+pillow>=9.0.0
+requests>=2.27.0
