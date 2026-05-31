@@ -1,6 +1,7 @@
 # pathfinder.py - 6 search algorithms for finding routes
 
 from heapq import heappush, heappop
+from collections import deque
 import math
 from config import DEFAULT_K_ROUTES
 from travel_time import calcTravelTime
@@ -69,7 +70,6 @@ class PathFinder:
 
     # run BFS from start to goal, return path + cost + nodes explored
     def bfs(self, start, goal, hour=12, dayOfWeek=2):
-        from collections import deque
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0

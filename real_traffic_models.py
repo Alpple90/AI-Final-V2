@@ -8,7 +8,6 @@ import joblib
 import warnings
 warnings.filterwarnings('ignore')
 
-from datetime import datetime
 import datetime as dt
 
 from tensorflow.keras.models import Sequential, load_model

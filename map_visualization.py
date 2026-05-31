@@ -23,7 +23,6 @@ class SCATSMapViewer:
         self.coords = {}
         self.markers = {}
         self.currentRouteItems = []
-        self.networkPaths = []
         self.isInitialized = False
 
     # read lat/lng for every SCATS site from the data source and store them
@@ -63,8 +62,7 @@ class SCATSMapViewer:
         if not self.mapWidget or not self.coords:
             return
 
-        self.networkPaths = drawEdges(self.mapWidget, self.coords)
-        self.networkVisible = True
+        drawEdges(self.mapWidget, self.coords)
 
         for sid, (lat, lng) in self.coords.items():
             colour = NODE_COLOURS.get(sid, '#1a1a2e')
@@ -169,6 +167,3 @@ class SCATSMapViewer:
     def getNodeConnections(self):
         return NODE_CONNECTIONS
 
-    # return the lat/lng coordinate dict for all loaded sites
-    def getCoords(self):
-        return self.coords
