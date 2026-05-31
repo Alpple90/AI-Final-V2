@@ -12,9 +12,8 @@ from datetime import datetime
 import datetime as dt
 
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input
+from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
 
 import xgboost as xgb
 
@@ -188,14 +187,12 @@ class RealTrafficPredictor:
     def _buildSequentialModel(self, layerType):
         """Build 2-layer LSTM or GRU with Dropout, sigmoid output."""
         LayerCls = LSTM if layerType == 'lstm' else GRU
-        model = Sequential([
-            Input(shape=(self.seqLen, 6)),
-            LayerCls(64, return_sequences=True),
-            Dropout(0.2),
-            LayerCls(64),
-            Dropout(0.2),
-            Dense(1, activation='sigmoid')
-        ])
+        model = Sequential()
+        model.add(LayerCls(64, input_shape=(self.seqLen, 6), return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LayerCls(64, return_sequences=False))
+        model.add(Dropout(0.2))
+        model.add(Dense(1, activation='sigmoid'))
         return model
 
     # -------------------------------------------------------------------------
@@ -210,24 +207,33 @@ class RealTrafficPredictor:
         model = self._buildSequentialModel(modelName)
         model.compile(loss='mse', optimizer='adam', metrics=['mape'])
 
-        callbacks = [
-            EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True),
-            ReduceLROnPlateau(factor=0.5, patience=10, min_lr=1e-6)
-        ]
+        early = EarlyStopping(
+            monitor='val_loss', patience=30, verbose=1,
+            mode='auto', restore_best_weights=True
+        )
+        reduceLearning = ReduceLROnPlateau(
+            monitor='val_loss', factor=0.5, patience=10,
+            verbose=1, min_lr=1e-6
+        )
 
         os.makedirs('saved_models', exist_ok=True)
 
         history = model.fit(
             xTrain, yTrain,
-            validation_split=0.05,
-            epochs=epochs,
             batch_size=self.batchSize,
-            callbacks=callbacks,
+            epochs=epochs,
+            validation_split=0.05,
+            callbacks=[early, reduceLearning],
             verbose=1 if verbose else 0
         )
 
         self.models[modelName] = model
         self.trainingHistory[modelName] = history.history
+
+        # Save loss history CSV (matching Train.py behaviour)
+        pd.DataFrame.from_dict(history.history).to_csv(
+            f'saved_models/{modelName}_loss.csv', encoding='utf-8', index=False
+        )
 
         if verbose:
             self.evalModel(modelName, model, xTest, yTest)
@@ -274,40 +280,49 @@ class RealTrafficPredictor:
     # -------------------------------------------------------------------------
 
     def _buildReference(self):
-        """Read data_test_reference.csv, return meta df with (SCATS Number, Day of week, Time)."""
-        refDf = pd.read_csv('data_test_reference.csv')
-        # Convert Time back to string (it was saved as HH:MM:SS)
-        refDf['Time'] = refDf['Time'].astype(str)
-        return refDf
+        """Read data_test_reference.csv and return per-site meta rows (GetFlow buildReference logic)."""
+        ref = pd.read_csv('data_test_reference.csv')
+        sites = ref['SCATS Number'].unique()
+
+        reference = []
+        for site in sites:
+            siteRef = ref[ref['SCATS Number'] == site].reset_index(drop=True)
+            for i in range(self.seqLen, len(siteRef)):
+                row = siteRef.iloc[i]
+                reference.append({
+                    'SCATS Number': site,
+                    'Day of week':  row['Day of week'],
+                    'Time':         str(row['Time']),
+                })
+
+        return pd.DataFrame(reference).reset_index(drop=True)
 
     def _buildTestWindows(self, refDf):
-        """Rebuild x_test windows from the reference CSV in the same order as training."""
+        """Rebuild x_test windows from the reference CSV (same order as _buildReference)."""
         featureCols = ['_scats_norm', '_flow_norm', 'day_sin', 'day_cos', 'time_sin', 'time_cos']
 
-        # Re-normalise (refDf already has the computed columns from _saveReference)
-        # But CSV load may have lost them — recompute if missing
-        if '_scats_norm' not in refDf.columns:
-            scatsNorm = self.scatsScaler.transform(
-                refDf['SCATS Number'].values.astype(float).reshape(-1, 1)
-            ).flatten()
-            refDf['_scats_norm'] = scatsNorm
+        fullRef = pd.read_csv('data_test_reference.csv')
 
-        if '_flow_norm' not in refDf.columns:
-            flowNorm = self.scaler.transform(
-                refDf['Flow'].values.reshape(-1, 1)
+        if '_scats_norm' not in fullRef.columns:
+            fullRef['_scats_norm'] = self.scatsScaler.transform(
+                fullRef['SCATS Number'].values.astype(float).reshape(-1, 1)
             ).flatten()
-            refDf['_flow_norm'] = flowNorm
 
-        if 'day_sin' not in refDf.columns:
-            dow  = refDf['Day of week'].values
-            tidx = refDf['_timeIdx'].values
-            refDf['day_sin']  = np.sin(2 * np.pi * dow  / 7)
-            refDf['day_cos']  = np.cos(2 * np.pi * dow  / 7)
-            refDf['time_sin'] = np.sin(2 * np.pi * tidx / 96)
-            refDf['time_cos'] = np.cos(2 * np.pi * tidx / 96)
+        if '_flow_norm' not in fullRef.columns:
+            fullRef['_flow_norm'] = self.scaler.transform(
+                fullRef['Flow'].values.reshape(-1, 1)
+            ).flatten()
+
+        if 'day_sin' not in fullRef.columns:
+            dow  = fullRef['Day of week'].values
+            tidx = fullRef['_timeIdx'].values
+            fullRef['day_sin']  = np.sin(2 * np.pi * dow  / 7)
+            fullRef['day_cos']  = np.cos(2 * np.pi * dow  / 7)
+            fullRef['time_sin'] = np.sin(2 * np.pi * tidx / 96)
+            fullRef['time_cos'] = np.cos(2 * np.pi * tidx / 96)
 
         xWindows, meta = [], []
-        for scat, siteData in refDf.groupby('SCATS Number'):
+        for scat, siteData in fullRef.groupby('SCATS Number'):
             siteData = siteData.reset_index(drop=True)
             features = siteData[featureCols].values
             for i in range(self.seqLen, len(features)):
@@ -322,14 +337,11 @@ class RealTrafficPredictor:
         return np.array(xWindows, dtype=np.float32), pd.DataFrame(meta)
 
     def precomputePredictions(self, folder='saved_models'):
-        """GetFlow precompute: run model.predict on full x_test, cache results."""
+        """Run model.predict on full x_test once, cache results (GetFlow precompute logic)."""
         print("--- Precomputing predictions for all models ---")
         os.makedirs(folder, exist_ok=True)
 
-        refDf = self._buildReference()
-        xTest, metaDf = self._buildTestWindows(refDf)
-
-        self.predictionCache = {}
+        xTest, metaDf = self._buildTestWindows(None)
 
         for modelName, model in self.models.items():
             print(f"  {modelName}...")
@@ -337,34 +349,33 @@ class RealTrafficPredictor:
             if modelName in ('lstm', 'gru'):
                 yPredScaled = model.predict(xTest, verbose=0).flatten()
             else:
-                xFlat = xTest.reshape(len(xTest), -1)
-                yPredScaled = model.predict(xFlat).flatten()
+                yPredScaled = model.predict(xTest.reshape(len(xTest), -1)).flatten()
 
-            # Inverse-transform flow predictions
+            # Inverse-transform (matching GetFlow scaler.inverse_transform)
             yPred = self.scaler.inverse_transform(yPredScaled.reshape(-1, 1)).flatten()
+
+            # Save per-model scaled predictions (matches GetFlow np.save pattern)
+            np.save(f'{folder}/y_pred_scaled_{modelName}.npy', yPredScaled)
 
             for i, row in metaDf.iterrows():
                 scatsNum = row['SCATS Number']
                 dow      = row['Day of week']
-                timeStr  = row['Time']  # 'HH:MM:SS'
-                hour     = int(timeStr[:2])
+                hour     = int(str(row['Time'])[:2])
 
                 cacheKey = (modelName, scatsNum, dow, hour)
                 flow = max(0, float(yPred[i]))
 
-                # Average if multiple predictions for same key
                 if cacheKey in self.predictionCache:
                     existing = self.predictionCache[cacheKey]
                     self.predictionCache[cacheKey] = (existing + flow) / 2
                 else:
                     self.predictionCache[cacheKey] = flow
 
-        # Convert to int
         self.predictionCache = {k: max(5, int(v)) for k, v in self.predictionCache.items()}
 
         joblib.dump(self.predictionCache, f'{folder}/prediction_cache.joblib')
-        joblib.dump(self.scaler,       f'{folder}/scaler.joblib')
-        joblib.dump(self.scatsScaler,  f'{folder}/scats_scaler.joblib')
+        joblib.dump(self.scaler,          f'{folder}/scaler.joblib')
+        joblib.dump(self.scatsScaler,     f'{folder}/scats_scaler.joblib')
         print(f"  Saved {len(self.predictionCache)} predictions to {folder}/")
 
     # -------------------------------------------------------------------------
