@@ -160,7 +160,7 @@ Testing was carried out at two levels: automated unit testing of the software mo
 
 ### 4.1 Unit Tests (`tests.py`)
 
-A total of **18 test cases** were written using Python's `unittest` framework. A lightweight 5-node mock graph and a `MockPredictor` that always returns 100 vehicles per 15 minutes are used in place of the real graph and ML models, so tests run without requiring the data files or trained models.
+A total of **20 test cases** were written using Python's `unittest` framework. A lightweight 5-node mock graph and a `MockPredictor` that always returns 100 vehicles per 15 minutes are used in place of the real graph and ML models, so tests run without requiring the data files or trained models.
 
 **Table 1 — Unit Test Summary**
 
@@ -174,22 +174,24 @@ A total of **18 test cases** were written using Python's `unittest` framework. A
 | 6 | TestPathFinderBasic | test\_bfs\_findsPath | BFS finds a path between connected nodes |
 | 7 | TestPathFinderBasic | test\_dfs\_findsPath | DFS finds a path between connected nodes |
 | 8 | TestPathFinderBasic | test\_dijkstra\_findsPath | Dijkstra finds a path between connected nodes |
-| 9 | TestPathFinderBasic | test\_sameOriginDest\_returnNoneOrZero | Same origin and destination returns None or cost 0 |
-| 10 | TestPathFinderEdgeCases | test\_invalidNode\_returnsNone | Unknown destination node returns None path |
-| 11 | TestPathFinderEdgeCases | test\_pathCost\_greaterThanZero | Valid path has a positive cost |
-| 12 | TestPathFinderEdgeCases | test\_path\_isListOfInts | Returned path is a list of integers |
-| 13 | TestFindUniquePaths | test\_findUniquePaths\_atMostFive | `findUniquePaths` returns ≤ 5 routes |
-| 14 | TestFindUniquePaths | test\_findUniquePaths\_sortedByCost | Routes are sorted ascending by travel time |
-| 15 | TestFindUniquePaths | test\_findUniquePaths\_noDuplicates | No two returned routes are identical |
-| 16 | TestRouteValidity | test\_path\_starts\_at\_origin\_ends\_at\_dest | Path begins at origin and ends at destination |
-| 17 | TestRouteValidity | test\_path\_has\_no\_cycles | Path contains no repeated nodes |
-| 18 | TestRouteValidity | test\_path\_edges\_exist\_in\_graph | Every consecutive node pair is connected in the graph |
+| 9 | TestPathFinderBasic | test\_greedy\_findsPath | Greedy finds a path between connected nodes |
+| 10 | TestPathFinderBasic | test\_bidirectionalAstar\_findsPath | Bidirectional A\* finds a path between connected nodes |
+| 11 | TestPathFinderBasic | test\_sameOriginDest\_returnNoneOrZero | Same origin and destination returns None or cost 0 |
+| 12 | TestPathFinderEdgeCases | test\_invalidNode\_returnsNone | Unknown destination node returns None path |
+| 13 | TestPathFinderEdgeCases | test\_pathCost\_greaterThanZero | Valid path has a positive cost |
+| 14 | TestPathFinderEdgeCases | test\_path\_isListOfInts | Returned path is a list of integers |
+| 15 | TestFindUniquePaths | test\_findUniquePaths\_atMostFive | `findUniquePaths` returns ≤ 5 routes |
+| 16 | TestFindUniquePaths | test\_findUniquePaths\_sortedByCost | Routes are sorted ascending by travel time |
+| 17 | TestFindUniquePaths | test\_findUniquePaths\_noDuplicates | No two returned routes are identical |
+| 18 | TestRouteValidity | test\_path\_starts\_at\_origin\_ends\_at\_dest | Path begins at origin and ends at destination |
+| 19 | TestRouteValidity | test\_path\_has\_no\_cycles | Path contains no repeated nodes |
+| 20 | TestRouteValidity | test\_path\_edges\_exist\_in\_graph | Every consecutive node pair is connected in the graph |
 
-**Result: 18/18 tests passed.**
+**Result: 20/20 tests passed.**
 
-*Figure 1 — Unit test output showing all 18 tests passing.*
+*Figure 1 — Unit test output showing all 20 tests passing.*
 
-![Test output showing 18 tests OK]
+![Test output showing 20 tests OK]
 
 ### 4.2 ML Model Evaluation (`evaluate_models.py`)
 
