@@ -135,12 +135,12 @@ class SCATSMapViewer:
                 highlightedNodes.add(nodeStr)
                 try:
                     marker.delete()
-                except:
+                except Exception:
                     pass
             else:
                 try:
                     item.delete()
-                except:
+                except Exception:
                     pass
         self.currentRouteItems = []
 

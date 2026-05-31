@@ -3,6 +3,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, LEFT_PANEL_WIDTH
+from real_traffic_models import DAY_NAMES
+
+ROUTE_COLOURS = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
 
 
 class TBRGSGUI:
@@ -91,8 +94,7 @@ class TBRGSGUI:
         tk.Label(inputFrame, text="Day of Week:", font=('Arial', 10),
                 bg='#f0f0f0').grid(row=3, column=0, sticky='w', pady=5)
         dayCombo = ttk.Combobox(inputFrame, textvariable=self.dayVar, width=20,
-                                values=['Monday', 'Tuesday', 'Wednesday', 'Thursday',
-                                        'Friday', 'Saturday', 'Sunday'], state='readonly')
+                                values=DAY_NAMES, state='readonly')
         dayCombo.grid(row=3, column=1, pady=5, padx=(10, 0))
         dayCombo.current(0)
 
@@ -203,9 +205,8 @@ class TBRGSGUI:
             if isinstance(w, tk.Label):
                 w.destroy()
 
-        routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         for i, (_, totalTime, _) in enumerate(self.currentPaths):
-            color = routeColors[i % len(routeColors)]
+            color = ROUTE_COLOURS[i % len(ROUTE_COLOURS)]
             btn = tk.Button(self.routeBtnsRow,
                             text=f"Route {i+1}",
                             command=lambda idx=i: self.selectRoute(idx),
@@ -217,10 +218,9 @@ class TBRGSGUI:
 
     # highlight the chosen route on the map and press its button in
     def selectRoute(self, idx):
-        routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.currentPaths[idx]
         self.mapViewer.clearRoute()
-        self.mapViewer.drawRoute(path, color=routeColors[idx % len(routeColors)], isBest=True)
+        self.mapViewer.drawRoute(path, color=ROUTE_COLOURS[idx % len(ROUTE_COLOURS)], isBest=True)
         for i, btn in enumerate(self.routeBtnsRow.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
@@ -254,11 +254,10 @@ class TBRGSGUI:
             timeStr = self.timeVar.get()
             hour = int(timeStr.split(':')[0]) if ':' in timeStr else int(timeStr)
             hour = max(0, min(23, hour))
-        except:
+        except (ValueError, AttributeError):
             hour = 12
 
-        dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        dayOfWeek = dayNames.index(self.dayVar.get())
+        dayOfWeek = DAY_NAMES.index(self.dayVar.get())
 
         return origin, dest, hour, dayOfWeek
 

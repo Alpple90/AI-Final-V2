@@ -2,9 +2,9 @@
 
 from heapq import heappush, heappop
 from collections import deque
-import math
 from config import DEFAULT_K_ROUTES
 from travel_time import calcTravelTime
+from graph_builder import haversineDistance
 
 
 class PathFinder:
@@ -54,19 +54,11 @@ class PathFinder:
         return round(totalTime, 2)
 
     def heuristic(self, node, goal):
-        # straight-line distance estimate using haversine
         if not self.coords or node not in self.coords or goal not in self.coords:
             return 0
         lat1, lon1 = self.coords[node]
         lat2, lon2 = self.coords[goal]
-        R = 6371
-        lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
-        lat2_r, lon2_r = math.radians(lat2), math.radians(lon2)
-        dlat = lat2_r - lat1_r
-        dlon = lon2_r - lon1_r
-        a = math.sin(dlat/2)**2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon/2)**2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        return R * c
+        return haversineDistance(lat1, lon1, lat2, lon2)
 
     # run BFS from start to goal, return path + cost + nodes explored
     def bfs(self, start, goal, hour=12, dayOfWeek=2):
@@ -120,12 +112,12 @@ class PathFinder:
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
 
-        pq = [(self.heuristic(startStr, goalStr), startStr, [startStr])]
+        counter = 0
+        pq = [(self.heuristic(startStr, goalStr), counter, startStr, [startStr])]
         visited = set()
         nodesExplored = 0
-
         while pq:
-            _, current, path = heappop(pq)
+            _, _, current, path = heappop(pq)
             nodesExplored += 1
             if current in visited:
                 continue
@@ -136,7 +128,8 @@ class PathFinder:
             for neighbor, _ in self.graph.get(current, []):
                 if neighbor not in visited:
                     h = self.heuristic(neighbor, goalStr)
-                    heappush(pq, (h, neighbor, path + [neighbor]))
+                    counter += 1
+                    heappush(pq, (h, counter, neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
     # A* search combining actual cost with haversine heuristic
@@ -174,12 +167,13 @@ class PathFinder:
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
 
-        pq = [(0, startStr, [startStr])]
+        counter = 0
+        pq = [(0, counter, startStr, [startStr])]
         visited = {}
         nodesExplored = 0
 
         while pq:
-            cost, current, path = heappop(pq)
+            cost, _, current, path = heappop(pq)
             nodesExplored += 1
             if current in visited and visited[current] <= cost:
                 continue
@@ -191,7 +185,8 @@ class PathFinder:
                     continue
                 edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
                 newCost = cost + edgeCost
-                heappush(pq, (newCost, neighbor, path + [neighbor]))
+                counter += 1
+                heappush(pq, (newCost, counter, neighbor, path + [neighbor]))
         return None, float('inf'), nodesExplored
 
     # A* searching from both ends simultaneously and merging when they meet
@@ -234,6 +229,8 @@ class PathFinder:
                     heappush(fwdPq, (newCost + h, counter, neighbor, path + [neighbor], newCost))
 
             # backward step
+            if not bwdPq:
+                break
             _, _, current, path, cost = heappop(bwdPq)
             nodesExplored += 1
             if current in bwdVisited and bwdVisited[current][0] <= cost:
@@ -251,7 +248,7 @@ class PathFinder:
                         continue
                     edgeCost = self.getEdgeCost(current, neighbor, distance, hour, dayOfWeek)
                     newCost = cost + edgeCost
-                    h = self.heuristic(neighbor, startStr)
+                    h = self.heuristic(neighbor, goalStr)
                     counter += 1
                     heappush(bwdPq, (newCost + h, counter, neighbor, path + [neighbor], newCost))
 

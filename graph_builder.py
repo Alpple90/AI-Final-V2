@@ -36,6 +36,6 @@ def buildGraph(connections, coords):
 def getGraphInfo(graph):
     return {
         'total_nodes': len(graph),
-        'total_edges': sum(len(v) for v in graph.values()) // 2,
+        'total_edges': sum(len(v) for v in graph.values()),
         'isolated_nodes': sum(1 for v in graph.values() if not v),
     }

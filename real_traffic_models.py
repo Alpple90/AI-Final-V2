@@ -312,6 +312,11 @@ class RealTrafficPredictor:
                 fullRef['Flow'].values.reshape(-1, 1)
             ).flatten()
 
+        if '_timeIdx' not in fullRef.columns:
+            fullRef['_timeIdx'] = fullRef['Time'].apply(
+                lambda t: int(str(t)[:2]) * 4 + int(str(t)[3:5]) // 15
+            )
+
         if 'day_sin' not in fullRef.columns:
             dow  = fullRef['Day of week'].values
             tidx = fullRef['_timeIdx'].values
@@ -342,6 +347,7 @@ class RealTrafficPredictor:
 
         xTest, metaDf = self._buildTestWindows(None)
 
+        cacheCounts = {}
         for modelName, model in self.models.items():
             print(f"  {modelName}...")
 
@@ -365,10 +371,12 @@ class RealTrafficPredictor:
                 flow = max(0, float(yPred[i]))
 
                 if cacheKey in self.predictionCache:
-                    existing = self.predictionCache[cacheKey]
-                    self.predictionCache[cacheKey] = (existing + flow) / 2
+                    n = cacheCounts[cacheKey]
+                    self.predictionCache[cacheKey] = (self.predictionCache[cacheKey] * n + flow) / (n + 1)
+                    cacheCounts[cacheKey] = n + 1
                 else:
                     self.predictionCache[cacheKey] = flow
+                    cacheCounts[cacheKey] = 1
 
         self.predictionCache = {k: max(5, int(v)) for k, v in self.predictionCache.items()}
 
