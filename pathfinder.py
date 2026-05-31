@@ -36,7 +36,7 @@ class PathFinder:
 
     def getEdgeCost(self, fromNode, toNode, distance, hour):
         # grab predicted flow for this edge, then convert to travel time
-        predictedFlow = self.traffic_predictor.predict(self.currentModel, None, hour)
+        predictedFlow = self.traffic_predictor.predict(self.currentModel, toNode, hour)
         return calcTravelTime(distance, predictedFlow)
 
     # sum up travel time across every edge in the path
