@@ -389,7 +389,13 @@ class RealTrafficPredictor:
 
     # look up a precomputed prediction — (model, site, dayOfWeek, hour)
     def predict(self, modelName, scatsNum, hourOfDay=12, dayOfWeek=2):
-        return self.predictionCache[(modelName, str(scatsNum), dayOfWeek, hourOfDay)]
+        key = (modelName, str(scatsNum), dayOfWeek, hourOfDay)
+        if key in self.predictionCache:
+            return self.predictionCache[key]
+        # site missing for this day — use average across available days
+        available = [self.predictionCache[(modelName, str(scatsNum), d, hourOfDay)]
+                     for d in range(7) if (modelName, str(scatsNum), d, hourOfDay) in self.predictionCache]
+        return int(np.mean(available)) if available else 100
 
     # write all trained models and the scaler to disk
     # build the test sequence lookup from the Excel file without full training data prep
