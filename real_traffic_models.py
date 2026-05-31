@@ -473,13 +473,22 @@ class RealTrafficPredictor:
 
         scalerPath = f'{folder}/scaler.joblib'
         if os.path.exists(scalerPath):
-            self.scaler = joblib.load(scalerPath)
-            print(f"Flow scaler loaded from {scalerPath}")
+            _s = joblib.load(scalerPath)
+            # Validate: must be a 1-feature scaler (flow-only MinMaxScaler)
+            if hasattr(_s, 'n_features_in_') and _s.n_features_in_ == 1:
+                self.scaler = _s
+                print(f"Flow scaler loaded from {scalerPath}")
+            else:
+                print(f"Flow scaler at {scalerPath} is incompatible (expected 1 feature) — will retrain")
 
         scatsScalerPath = f'{folder}/scats_scaler.joblib'
         if os.path.exists(scatsScalerPath):
-            self.scatsScaler = joblib.load(scatsScalerPath)
-            print(f"SCATS scaler loaded from {scatsScalerPath}")
+            _ss = joblib.load(scatsScalerPath)
+            if hasattr(_ss, 'n_features_in_') and _ss.n_features_in_ == 1:
+                self.scatsScaler = _ss
+                print(f"SCATS scaler loaded from {scatsScalerPath}")
+            else:
+                print(f"SCATS scaler at {scatsScalerPath} is incompatible — will retrain")
 
         cachePath = f'{folder}/prediction_cache.joblib'
         if os.path.exists(cachePath):
@@ -487,6 +496,9 @@ class RealTrafficPredictor:
             print(f"Prediction cache loaded ({len(self.predictionCache)} entries)")
         elif loaded and self.scaler is not None:
             self.precomputePredictions(folder)
+        elif loaded and self.scaler is None:
+            print("WARNING: Models loaded but scaler is missing or incompatible.")
+            print("         Delete saved_models/ and retrain: python real_traffic_models.py")
 
         return loaded
 
