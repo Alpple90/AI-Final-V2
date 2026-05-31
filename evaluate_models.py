@@ -106,11 +106,34 @@ def runEvaluation():
         ax.set_ylabel('Traffic volume (vehicles/15min)')
         ax.legend()
 
-    plt.suptitle('Predicted vs Actual Traffic Volume', fontsize=14)
+    plt.suptitle('Predicted vs Actual Traffic Volume (First 500 Samples)', fontsize=14)
     plt.tight_layout()
     plt.savefig('model_comparison.png', dpi=150)
     plt.close()
     print("  Plot saved to model_comparison.png")
+
+    # plot first 100 samples for a closer look
+    fig2, axes2 = plt.subplots(1, numModels, figsize=(6 * numModels, 5))
+    if numModels == 1:
+        axes2 = [axes2]
+    plotLimit100 = 100
+    xAxis100 = np.arange(plotLimit100)
+
+    for ax, (name, metrics) in zip(axes2, results.items()):
+        yActual = yTestActual[:plotLimit100]
+        yPredPlot = metrics['preds'][:plotLimit100]
+        ax.plot(xAxis100, yActual, label='Actual', alpha=0.7)
+        ax.plot(xAxis100, yPredPlot, label='Predicted', alpha=0.7)
+        ax.set_title(f"{name}\nMAE={metrics['mae']:.2f}  R²={metrics['r2']:.4f}")
+        ax.set_xlabel('Sample')
+        ax.set_ylabel('Traffic volume (vehicles/15min)')
+        ax.legend()
+
+    plt.suptitle('Predicted vs Actual Traffic Volume (First 100 Samples)', fontsize=14)
+    plt.tight_layout()
+    plt.savefig('model_comparison_100.png', dpi=150)
+    plt.close()
+    print("  Plot saved to model_comparison_100.png")
 
     print("--- Summary ---")
     bestMetrics = results[bestName]
