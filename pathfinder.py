@@ -62,50 +62,69 @@ class PathFinder:
         lat2, lon2 = self.coords[goal]
         return haversineDistance(lat1, lon1, lat2, lon2)
 
-    # run BFS from start to goal, return path + cost + nodes explored
+    # run BFS from start to goal using a parent dict to trace the path
     def bfs(self, start, goal, hour=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
 
-        queue = deque([(startStr, [startStr])])
-        visited = {startStr}
-        nodesExplored = 0
+        visited = []
+        queue = deque([startStr])
+        parent = {startStr: None}
+        nodesExplored = 1
 
         while queue:
-            current, path = queue.popleft()
-            nodesExplored += 1
+            current = queue.popleft()
             if current == goalStr:
-                totalTime = self.calcPathTime([int(n) for n in path], hour, dayOfWeek)
-                return [int(n) for n in path], totalTime, nodesExplored
-            for neighbor, _ in self.graph.get(current, []):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    queue.append((neighbor, path + [neighbor]))
+                visited.append(current)
+                path = []
+                node = current
+                while node is not None:
+                    path.append(node)
+                    node = parent[node]
+                path = list(reversed(path))
+                intPath = [int(n) for n in path]
+                return intPath, self.calcPathTime(intPath, hour, dayOfWeek), nodesExplored
+            if current not in visited:
+                visited.append(current)
+                for neighbor, _ in self.graph.get(current, []):
+                    if neighbor not in visited and neighbor not in queue:
+                        queue.append(neighbor)
+                        nodesExplored += 1
+                        parent[neighbor] = current
         return None, float('inf'), nodesExplored
 
-    # run DFS from start to goal with a depth cap to avoid runaway paths
-    def dfs(self, start, goal, hour=12, maxDepth=50, dayOfWeek=2):
+    # run DFS from start to goal using a parent dict to trace the path
+    def dfs(self, start, goal, hour=12, dayOfWeek=2):
         startStr, goalStr = str(start), str(goal)
         if startStr not in self.graph or goalStr not in self.graph:
             return None, float('inf'), 0
 
-        stack = [(startStr, [startStr], 0)]
-        visited = set()
-        nodesExplored = 0
+        visited = []
+        stack = [startStr]
+        parent = {startStr: None}
+        nodesExplored = 1
 
         while stack:
-            current, path, depth = stack.pop()
-            nodesExplored += 1
+            current = stack.pop()
             if current == goalStr:
-                totalTime = self.calcPathTime([int(n) for n in path], hour, dayOfWeek)
-                return [int(n) for n in path], totalTime, nodesExplored
-            if current in visited or depth > maxDepth:
-                continue
-            visited.add(current)
-            for neighbor, _ in self.graph.get(current, []):
-                if neighbor not in path:
-                    stack.append((neighbor, path + [neighbor], depth + 1))
+                visited.append(current)
+                path = []
+                node = current
+                while node is not None:
+                    path.append(node)
+                    node = parent[node]
+                path = list(reversed(path))
+                intPath = [int(n) for n in path]
+                return intPath, self.calcPathTime(intPath, hour, dayOfWeek), nodesExplored
+            if current not in visited:
+                visited.append(current)
+                for neighbor, _ in reversed(self.graph.get(current, [])):
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+                        nodesExplored += 1
+                        if neighbor not in parent:
+                            parent[neighbor] = current
         return None, float('inf'), nodesExplored
 
     # greedy best-first search, picks the node that looks closest to the goal
