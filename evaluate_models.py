@@ -1,5 +1,7 @@
 # evaluate_models.py - compare LSTM, GRU and XGBoost on held-out test data
+import os
 import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -7,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from real_traffic_models import RealTrafficPredictor
 from pathfinder import PathFinder
-from graph_builder import buildGraph, getGraphInfo
+from graph_builder import buildGraph
 from map_visualization import SCATSMapViewer
 
 
@@ -24,32 +26,48 @@ def runEvaluation():
         print("No saved models found. Run real_traffic_models.py first to train.")
         return
 
-    xTestLstm = data['X_test_lstm']
-    xTestXgb  = data['X_test_xgb']
-    yTest     = data['y_test']
+    yTest = data['y_test']
 
+    # Build test meta from prediction cache keys so we can evaluate per-window
+    # For each test window we need (scatsNum, dayOfWeek, hour) — derive from cache
     results = {}
-    modelConfigs = [
-        ('LSTM',    'lstm',    xTestLstm),
-        ('GRU',     'gru',     xTestLstm),
-        ('XGBoost', 'xgboost', xTestXgb),
-    ]
+    modelKeys = [('LSTM', 'lstm'), ('GRU', 'gru'), ('XGBoost', 'xgboost')]
+
+    # Inverse-transform y_test for evaluation
+    if predictor.scaler is not None:
+        yTestActual = predictor.scaler.inverse_transform(
+            np.array(yTest).reshape(-1, 1)
+        ).flatten()
+    else:
+        yTestActual = np.array(yTest, dtype=np.float32)
+
+    # Rebuild test windows to get meta (site, day, hour) for each sample
+    if os.path.exists('data_test_reference.csv'):
+        refDf = pd.read_csv('data_test_reference.csv')
+        _, metaDf = predictor.buildTestWindows(refDf)
+        testScats = metaDf['SCATS Number'].tolist()
+        testDays  = metaDf['Day of week'].tolist()
+        testHours = [int(str(t)[:2]) for t in metaDf['Time'].tolist()]
+    else:
+        print("data_test_reference.csv not found — run loadData() first")
+        return
 
     print("--- Generating predictions ---")
-    for displayName, modelKey, xTest in modelConfigs:
+    for displayName, modelKey in modelKeys:
         if modelKey not in predictor.models:
             print(f"  {displayName}: model not found, skipping")
             continue
 
-        model = predictor.models[modelKey]
-        if modelKey in ['lstm', 'gru']:
-            yPred = model.predict(xTest, verbose=0).flatten()
-        else:
-            yPred = model.predict(xTest)
+        nSamples = min(len(yTestActual), len(testScats))
+        yPred = np.array([
+            predictor.predict(modelKey, testScats[i], testHours[i], testDays[i])
+            for i in range(nSamples)
+        ], dtype=np.float32)
+        yTestEval = yTestActual[:nSamples]
 
-        mae  = mean_absolute_error(yTest, yPred)
-        rmse = np.sqrt(mean_squared_error(yTest, yPred))
-        r2   = r2_score(yTest, yPred)
+        mae  = mean_absolute_error(yTestEval, yPred)
+        rmse = np.sqrt(mean_squared_error(yTestEval, yPred))
+        r2   = r2_score(yTestEval, yPred)
 
         results[displayName] = {'mae': mae, 'rmse': rmse, 'r2': r2, 'preds': yPred}
         print(f"  {displayName} done")
@@ -79,7 +97,7 @@ def runEvaluation():
     xAxis = np.arange(plotLimit)
 
     for ax, (name, metrics) in zip(axes, results.items()):
-        yActual = yTest[:plotLimit]
+        yActual = yTestActual[:plotLimit]
         yPredPlot = metrics['preds'][:plotLimit]
         ax.plot(xAxis, yActual, label='Actual', alpha=0.7)
         ax.plot(xAxis, yPredPlot, label='Predicted', alpha=0.7)

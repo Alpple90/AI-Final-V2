@@ -17,16 +17,16 @@ def trainModels(predictor):
     data = predictor.loadData()
 
     print("--- Training LSTM model ---")
-    predictor.trainLSTM(data['X_train_lstm'], data['y_train'],
-                        data['X_test_lstm'], data['y_test'], epochs=30, verbose=True)
+    predictor.trainLSTM(data['x_train'], data['y_train'],
+                        data['x_test'],  data['y_test'], epochs=600, verbose=True)
 
     print("--- Training GRU model ---")
-    predictor.trainGRU(data['X_train_lstm'], data['y_train'],
-                       data['X_test_lstm'], data['y_test'], epochs=30, verbose=True)
+    predictor.trainGRU(data['x_train'], data['y_train'],
+                       data['x_test'],  data['y_test'], epochs=600, verbose=True)
 
     print("--- Training XGBoost model ---")
-    predictor.trainXGB(data['X_train_xgb'], data['y_train'],
-                       data['X_test_xgb'], data['y_test'], verbose=True)
+    predictor.trainXGB(data['x_train_flat'], data['y_train'],
+                       data['x_test_flat'],  data['y_test'], verbose=True)
 
     print("--- Saving models ---")
     predictor.saveModels()

@@ -12,6 +12,7 @@ from config import (
 _INTERSECTION_DELAY_MIN = INTERSECTION_DELAY_SEC / 60
 
 
+# convert hourly flow to speed in km/h using the quadratic flow-speed model
 def flowToSpeed(flowPerHour):
     # free flow below threshold, otherwise use quadratic model
     if flowPerHour <= FREE_FLOW_THRESHOLD:

@@ -3,6 +3,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from config import WINDOW_WIDTH, WINDOW_HEIGHT, LEFT_PANEL_WIDTH
+from real_traffic_models import DAY_NAMES
+
+ROUTE_COLOURS = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
 
 
 class TBRGSGUI:
@@ -16,6 +19,7 @@ class TBRGSGUI:
         self.originVar = tk.StringVar()
         self.destVar = tk.StringVar()
         self.timeVar = tk.StringVar(value="12:00")
+        self.dayVar = tk.StringVar(value='Monday')
 
         self.mapWidget = None
         self.resultsText = None
@@ -86,6 +90,13 @@ class TBRGSGUI:
                 font=('Arial', 10)).grid(row=2, column=1, sticky='w', pady=5, padx=(10, 0))
         tk.Label(inputFrame, text="(HH:MM, 24hr)", font=('Arial', 8),
                 bg='#f0f0f0').grid(row=2, column=1, sticky='e', padx=(0, 10))
+
+        tk.Label(inputFrame, text="Day of Week:", font=('Arial', 10),
+                bg='#f0f0f0').grid(row=3, column=0, sticky='w', pady=5)
+        dayCombo = ttk.Combobox(inputFrame, textvariable=self.dayVar, width=20,
+                                values=DAY_NAMES, state='readonly')
+        dayCombo.grid(row=3, column=1, pady=5, padx=(10, 0))
+        dayCombo.current(0)
 
     # add radio buttons for choosing LSTM, GRU or XGBoost
     def buildModelFrame(self, parent):
@@ -194,9 +205,8 @@ class TBRGSGUI:
             if isinstance(w, tk.Label):
                 w.destroy()
 
-        routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         for i, (_, totalTime, _) in enumerate(self.currentPaths):
-            color = routeColors[i % len(routeColors)]
+            color = ROUTE_COLOURS[i % len(ROUTE_COLOURS)]
             btn = tk.Button(self.routeBtnsRow,
                             text=f"Route {i+1}",
                             command=lambda idx=i: self.selectRoute(idx),
@@ -208,10 +218,9 @@ class TBRGSGUI:
 
     # highlight the chosen route on the map and press its button in
     def selectRoute(self, idx):
-        routeColors = ['#ff6f00', '#1565c0', '#6a1b9a', '#00838f', '#558b2f']
         path, _, _ = self.currentPaths[idx]
         self.mapViewer.clearRoute()
-        self.mapViewer.drawRoute(path, color=routeColors[idx % len(routeColors)], isBest=True)
+        self.mapViewer.drawRoute(path, color=ROUTE_COLOURS[idx % len(ROUTE_COLOURS)], isBest=True)
         for i, btn in enumerate(self.routeBtnsRow.winfo_children()):
             btn.config(relief='sunken' if i == idx else 'raised')
 
@@ -245,14 +254,16 @@ class TBRGSGUI:
             timeStr = self.timeVar.get()
             hour = int(timeStr.split(':')[0]) if ':' in timeStr else int(timeStr)
             hour = max(0, min(23, hour))
-        except:
+        except (ValueError, AttributeError):
             hour = 12
 
-        return origin, dest, hour
+        dayOfWeek = DAY_NAMES.index(self.dayVar.get())
+
+        return origin, dest, hour, dayOfWeek
 
     # kick off a route search using all 6 algorithms and show the top results
     def findRoutes(self):
-        origin, dest, hour = self.getUserInput()
+        origin, dest, hour, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -267,7 +278,7 @@ class TBRGSGUI:
 
         self.pathfinder.setModel(modelName)
 
-        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5)
+        paths = self.pathfinder.findUniquePaths(origin, dest, hour, maxPaths=5, dayOfWeek=dayOfWeek)
 
         self.currentPaths = paths
         if paths:
@@ -331,7 +342,7 @@ class TBRGSGUI:
 
     # run all 6 algorithms on the same trip and print a side-by-side comparison
     def compareAlgos(self):
-        origin, dest, hour = self.getUserInput()
+        origin, dest, hour, dayOfWeek = self.getUserInput()
         if origin is None:
             return
 
@@ -361,7 +372,7 @@ class TBRGSGUI:
         for algo, name in zip(algorithms, algoNames):
             self.pathfinder.setAlgorithm(algo)
             self.pathfinder.setModel(modelName)
-            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour)
+            path, cost, nodes = self.pathfinder.findPath(origin, dest, hour, dayOfWeek)
 
             if path:
                 self.resultsText.insert(tk.END, f"{name:<16} {cost:<8.1f} {nodes:<7} Y\n")

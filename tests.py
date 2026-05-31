@@ -2,6 +2,7 @@
 import unittest
 import sys
 import os
+from io import StringIO
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -29,15 +30,16 @@ MOCK_CONNECTIONS = {
 
 
 class MockPredictor:
-    # always return a steady 100 vehicles per 15 min
-    def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
+    def predict(self, *args, **kwargs):
         return 100
 
 
+# build a small 5-node graph from the mock data
 def makeMockGraph():
     return buildGraph(MOCK_CONNECTIONS, MOCK_COORDS)
 
 
+# build a PathFinder using the mock graph and a fixed-flow predictor
 def makePathFinder():
     graph = makeMockGraph()
     pf = PathFinder(graph, MockPredictor(), MOCK_COORDS)
@@ -136,6 +138,11 @@ class TestPathFinderEdgeCases(unittest.TestCase):
 class TestFindUniquePaths(unittest.TestCase):
     def setUp(self):
         self.pf = makePathFinder()
+        self._stdout = sys.stdout
+        sys.stdout = StringIO()
+
+    def tearDown(self):
+        sys.stdout = self._stdout
 
     # test 13: findUniquePaths returns at most 5 routes
     def test_findUniquePaths_atMostFive(self):
@@ -153,6 +160,36 @@ class TestFindUniquePaths(unittest.TestCase):
         routes = self.pf.findUniquePaths('970', '2000', maxPaths=5)
         pathTuples = [tuple(p) for p, _, _ in routes]
         self.assertEqual(len(pathTuples), len(set(pathTuples)))
+
+
+# Test that returned paths are structurally valid
+class TestRouteValidity(unittest.TestCase):
+    def setUp(self):
+        self.pf = makePathFinder()
+        self.graph = makeMockGraph()
+
+    # Test path starts at origin and ends at destination
+    def test_path_starts_at_origin_ends_at_dest(self):
+        path, _, _ = self.pf.astar('970', '2000')
+        self.assertIsNotNone(path)
+        self.assertEqual(path[0], 970)
+        self.assertEqual(path[-1], 2000)
+
+    # Test path contains no repeated nodes (no cycles)
+    def test_path_has_no_cycles(self):
+        path, _, _ = self.pf.astar('970', '4043')
+        self.assertIsNotNone(path)
+        self.assertEqual(len(path), len(set(path)))
+
+    # Test every consecutive node pair in the path is actually connected in the graph
+    def test_path_edges_exist_in_graph(self):
+        path, _, _ = self.pf.astar('970', '2000')
+        self.assertIsNotNone(path)
+        for i in range(len(path) - 1):
+            fromNode = str(path[i])
+            toNode = str(path[i + 1])
+            neighbours = [n for n, _ in self.graph.get(fromNode, [])]
+            self.assertIn(toNode, neighbours)
 
 
 if __name__ == '__main__':
