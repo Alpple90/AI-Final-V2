@@ -291,13 +291,6 @@ class RealTrafficPredictor:
 
     # run the chosen model on the given traffic sequence and return a flow prediction
     def predict(self, modelName, lastSeq, hourOfDay=12, dayOfWeek=2):
-        # fall back to time-of-day heuristic if no model or sequence
-        if lastSeq is None:
-            return self.fallbackPredict(hourOfDay)
-
-        if modelName not in self.models:
-            return self.fallbackPredict(hourOfDay)
-
         model = self.models[modelName]
 
         # pad or trim sequence to the right length
@@ -319,20 +312,6 @@ class RealTrafficPredictor:
             predVolume = model.predict(features)[0]
 
         return max(5, int(predVolume))
-
-    # estimate traffic flow from the hour of day when no trained model is available
-    def fallbackPredict(self, hourOfDay):
-        # rough hourly traffic profile when no model is available
-        if 7 <= hourOfDay <= 9:
-            return 180 + (hourOfDay - 7) * 50
-        elif 16 <= hourOfDay <= 19:
-            return 160 + (hourOfDay - 16) * 40
-        elif hourOfDay >= 22 or hourOfDay <= 5:
-            return 30
-        elif 10 <= hourOfDay <= 15:
-            return 100
-        else:
-            return 70
 
     # write all trained models and the scaler to disk
     def saveModels(self, folder='saved_models'):
