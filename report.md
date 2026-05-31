@@ -118,7 +118,7 @@ The road network is represented as a weighted directed graph of 39 SCATS (Sydney
 - **GRU (Gated Recurrent Unit)** — a streamlined variant of LSTM with fewer parameters, offering comparable predictive accuracy with faster training times.
 - **XGBoost** — a gradient-boosted decision tree ensemble that treats traffic prediction as a tabular regression problem, using flattened sequence windows as input features.
 
-Each model is trained on the first three weeks of October (1–24) and evaluated on the final week (25–31). Input windows consist of the 12 most recent 15-minute readings (3 hours) for a given site, encoded with cyclical features for time of day (period 96) and day of week (period 7) using sine and cosine transformations.
+Each model is trained on October 1–24 and evaluated on October 24–31 (day 24 is included in both splits to provide a full window of context at the start of the test set). Input windows consist of the 12 most recent 15-minute readings (3 hours) for a given site, encoded with cyclical features for time of day (period 96) and day of week (period 7) using sine and cosine transformations.
 
 **Route search** is handled by six algorithms carried over from Assignment 2A: BFS, DFS, Greedy Best-First, A\*, Dijkstra, and Bidirectional A\*. Yen's K-shortest paths algorithm is applied on top of each search method so that each can propose multiple distinct routes. All candidate routes from all six algorithms are pooled, deduplicated, and the top 5 by estimated travel time are returned to the user.
 
@@ -195,7 +195,7 @@ A total of **20 test cases** were written using Python's `unittest` framework. A
 
 ### 4.2 ML Model Evaluation (`evaluate_models.py`)
 
-All three models were evaluated on the held-out test split (October 25–31) of the SCATS dataset. Figure 2 shows the first 500 samples of the test set for visual comparison; MAE, RMSE, and R² are computed across the full test set.
+All three models were evaluated on the held-out test split (October 24–31) of the SCATS dataset. Figure 2 shows the first 500 samples of the test set for visual comparison; MAE, RMSE, and R² are computed across the full test set.
 
 **Table 2 — ML Model Performance Metrics**
 
