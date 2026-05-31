@@ -349,6 +349,7 @@ class RealTrafficPredictor:
         print("--- Precomputing predictions for all models ---")
         os.makedirs(folder, exist_ok=True)
 
+        self.predictionCache = {}
         xTest, metaDf = self.buildTestWindows(None)
 
         cacheCounts = {}
