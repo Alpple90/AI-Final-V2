@@ -119,7 +119,7 @@ class PathFinder:
                 return intPath, self.calcPathTime(intPath, hour, dayOfWeek), nodesExplored
             if current not in visited:
                 visited.append(current)
-                for neighbor, _ in reversed(self.graph.get(current, [])):
+                for neighbor, _ in self.graph.get(current, []):
                     if neighbor not in visited:
                         stack.append(neighbor)
                         nodesExplored += 1
