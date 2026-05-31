@@ -48,8 +48,7 @@
 Install dependencies before running:
 
 ```
-pip install "tensorflow>=2.21.0" "keras>=3.14.0" xgboost scikit-learn pandas openpyxl xlrd
-pip install tkintermapview requests pillow
+pip install -r requirements.txt
 ```
 
 The following data files must be present in the project root:
