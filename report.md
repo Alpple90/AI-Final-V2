@@ -48,7 +48,7 @@
 Install dependencies before running:
 
 ```
-pip install tensorflow xgboost scikit-learn pandas openpyxl xlrd
+pip install "tensorflow>=2.21.0" "keras>=3.14.0" xgboost scikit-learn pandas openpyxl xlrd
 pip install tkintermapview requests pillow
 ```
 
