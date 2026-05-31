@@ -135,7 +135,12 @@ class RealTrafficPredictor:
             dayOfWeek[self.seqLen:-1]
         ])
 
-        splitIdx = int(len(X) * 0.8)
+        # split at Oct 25 — first 3 weeks train, last week (Oct 25-31) test
+        # timestamps offset by seqLen since each window target is seqLen steps ahead
+        splitIdx = next(
+            i for i, ts in enumerate(timestamps[self.seqLen:-1])
+            if ts.day >= 25
+        )
 
         xTrainSeq = X[:splitIdx]
         xTestSeq = X[splitIdx:]
